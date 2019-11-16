@@ -32,6 +32,9 @@ class Record:
         self.length = len(data)
         self.bytesread = 0
     
+    def remains(self):
+        return self.length - self.bytesread
+
     def get_data(self, size):
         start = self.bytesread
         end = start + size
@@ -333,6 +336,7 @@ BSM_TOKEN_FETCHS = {
     AUT_TEXT: Text,
     AUT_PATH: Path,
     AUT_RETURN32: Return32,
+    AUT_TRAILER: Trailer,
 }
 def au_fetch_tok(record: Record):
     while True:
@@ -342,7 +346,10 @@ def au_fetch_tok(record: Record):
         if record.header in BSM_TOKEN_FETCHS:
             yield BSM_TOKEN_FETCHS[record.header].fetch(record)
         else:
-            raise NotYetImplementedToken(f"NotYeImplementedToken: 0x{record.header:x}")
+            raise NotYetImplementedToken(f"NotYeImplementedToken: 0x{record.header:x}, reamins: {record.remains()}")
+
+def au_fetch_invalid_tok(record: Record):
+    pass
 
 
 def au_read_rec(fp): 
