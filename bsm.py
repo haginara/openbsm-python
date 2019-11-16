@@ -459,7 +459,8 @@ def au_read_rec(fp):
             #print(f"recsize(unpacked): {recsize}")
             if recsize < struct.calcsize("I") + struct.calcsize("b"):
                 return None
-            yield Record(bsm_type, _bsm_type + _recsize + fp.read(recsize), recsize)
+            data = fpread(recsize)
+            #yield Record(bsm_type, _bsm_type + _recsize + data, recsize)
 
         elif bsm_type == AUT_OTHER_FILE32:
             pass
