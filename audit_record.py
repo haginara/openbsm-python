@@ -86,6 +86,12 @@ AUT_SOCKINET32 = 0x80	#XXX
 AUT_SOCKINET128 = 0x81	# XXX 
 AUT_SOCKUNIX = 0x82		#XXX 
 #
+
+# Apple specific tokens
+AUT_IDENTITY = 0xed
+AUT_KRB5_PRINCIPA = 0xee
+AUT_CERT_HAHSH = 0xef
+
 #print values for the arbitrary token 
 AUP_BINARY = 0
 AUP_OCTAL = 1

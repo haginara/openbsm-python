@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 
 AUDIT_EVENTS = get_audit_events()
 
+AUDIT_HEADER_SIZE = 18
+AUDIT_TRAILER_SIZE = 7
+
 
 class NotYetImplementedToken(Exception):
     pass
@@ -26,10 +29,10 @@ class UnknownHeader(Exception):
 
 
 class Record:
-    def __init__(self, header, data):
+    def __init__(self, header, data, length):
         self.header = header
         self.data = data
-        self.length = len(data)
+        self.length = length
         self.bytesread = 0
     
     def remains(self):
@@ -39,7 +42,7 @@ class Record:
         start = self.bytesread
         end = start + size
         if end > self.length:
-            raise Exception("size is bigger than length")
+            raise Exception(f"size is bigger than length: {end} > {self.length}")
         self.bytesread += size
         logger.debug(f"start: {start}, end: {end}")
         return self.data[start: end]
@@ -98,7 +101,7 @@ class RootToken(BaseToken):
         self.format_dict = {
             "header": ">B",
             "recsize": ">I",
-            "data": "s",
+            "data": ">s{recsize}",
         }
 
 class Header(BaseToken):
@@ -223,6 +226,20 @@ class Trailer(BaseToken):
             "magic": ">H",
             "count": ">I",
         }
+    
+    def _print(self, oflags: int):
+        if oflags & AU_OFLAG_XML:
+            for name in self.format_dict:
+                print(f"{name}={getattr(self, name)}")
+        elif oflags & AU_OFLAG_RAW:
+            print(
+                f"{self.count}"
+            )
+        else:
+            print(
+                f"{self.count}"
+            )
+
 
 class Argument(BaseToken):
     """
@@ -326,20 +343,96 @@ class Return32(BaseToken):
                 f"{self.value}"
             )
 
+class Identity(BaseToken):
+    """
+    <identity signer-type="1" signing-id="com.apple.xpc.launchd" signing-id-truncated="no" team-id="" team-id-truncated="no" cdhash="0x2623e0657eb3c1c063dec9aeef40a0ce175d1ec9" />
+    """
+    name = "Identity"
+    token_name = "identity"
+
+    def _setup(self):
+        self.format_dict = {
+            "signer_type": ">I",
+            "signing_size": ">H",
+            "signing_id": ">{signing_size}s",
+            "signing_id_truncated": ">B",
+            "team_id_length": ">H",
+            "team_id": ">{team_id_length}s",
+            "team_id_truncated": ">B",
+            "cdhash_size": ">H",
+            "cdhash": ">{cdhash_size}s"
+        }
+    
+    @property
+    def signing_id(self):
+        return self._signing_id.decode()
+
+    @signing_id.setter
+    def signing_id(self, signing_id):
+        self._signing_id = signing_id
+
+    @property
+    def team_id(self):
+        return self._team_id
+
+    @team_id.setter
+    def team_id(self, team_id):
+        self._team_id = team_id
+
+    @property
+    def cdhash(self):
+        return "0x" + "".join([f"{x:2x}" for x in self._cdhash])
+
+    @cdhash.setter
+    def cdhash(self, cdhash):
+        self._cdhash = cdhash
+
+    def _print(self, oflags: int):
+        if oflags & AU_OFLAG_XML:
+            for name in self.format_dict:
+                print(f"{name}={getattr(self, name)}")
+        elif oflags & AU_OFLAG_RAW:
+            print(
+                f"{self.signer_type}{self.delm}"
+                f"{self.signing_id}{self.delm}"
+                f"{self.signing_id_truncated}{self.delm}"
+                f"{self.team_id_truncated}{self.delm}"
+                f"{self.cdhash}{self.delm}"
+            )
+        else:
+            print(
+                f"{self.signer_type}{self.delm}"
+                f"{self.signing_id}{self.delm}"
+                f"{self.signing_id_truncated}{self.delm}"
+                f"{self.team_id_truncated}{self.delm}"
+                f"{self.cdhash}{self.delm}"
+            )
+
+
 def au_print_flag_tok(token, delm: str, oflags: int):
     if token.id == AUT_HEADER32:
         token.print(oflags)
 
+def au_fetch_invalid_tok(record: Record):
+    err = 0
+    recoversize = record.length - (record.bytesread + AUDIT_TRAILER_SIZE)
+    if recoversize <= 0:
+        return -1
+
+    invalid_length = recoversize
+    #SET_PTR((char*)buf, len, tok->tt.invalid.data, recoversize, tok->len,
+    return 0
 
 BSM_TOKEN_FETCHS = {
     AUT_HEADER32: Header32,
     AUT_TEXT: Text,
     AUT_PATH: Path,
     AUT_RETURN32: Return32,
+    AUT_IDENTITY: Identity,
     AUT_TRAILER: Trailer,
 }
 def au_fetch_tok(record: Record):
-    while True:
+    while record.bytesread < record.length:
         _bsm_type = record.get_data(1)
         record.header = struct.unpack('>B', _bsm_type)[0]
         logger.debug(f"{record.header}")
@@ -347,17 +440,16 @@ def au_fetch_tok(record: Record):
             yield BSM_TOKEN_FETCHS[record.header].fetch(record)
         else:
             raise NotYetImplementedToken(f"NotYeImplementedToken: 0x{record.header:x}, reamins: {record.remains()}")
+        logger.info(f"Total: {record.length}, read: {record.bytesread}")
 
-def au_fetch_invalid_tok(record: Record):
-    pass
 
 
 def au_read_rec(fp): 
     while True:
         try:
             _bsm_type = fp.read(1)
-        except Exception:
-            break
+        except Exception as e:
+            raise Exception(e)
         bsm_type = struct.unpack('b', _bsm_type)[0]
         #print(bsm_type)
         if bsm_type in [AUT_HEADER32, AUT_HEADER32_EX, AUT_HEADER64, AUT_HEADER64_EX]:
@@ -367,7 +459,7 @@ def au_read_rec(fp):
             #print(f"recsize(unpacked): {recsize}")
             if recsize < struct.calcsize("I") + struct.calcsize("b"):
                 return None
-            yield Record(bsm_type, _bsm_type + _recsize + fp.read(recsize))
+            yield Record(bsm_type, _bsm_type + _recsize + fp.read(recsize), recsize)
 
         elif bsm_type == AUT_OTHER_FILE32:
             pass
@@ -382,4 +474,4 @@ def au_read_rec(fp):
             #filenamelen
             #ntohs(filenamelen)
             #buffer = type | sec | msec | filenamelen | noths(filenamelen)
-            raise UnknownHeader
+            raise UnknownHeader(f"Unknown header: {bsm_type}")
