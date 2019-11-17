@@ -3,18 +3,23 @@ from bsm import *
 from bsm_h import *
 import sys
 import os
+import logging
 
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: program <path>")
+logging.basicConfig(level=logging.INFO)
 
-    path = sys.argv[1]
-    with open(path, 'rb') as f:
-        try:
-            for record in au_read_rec(f):
-                for token in au_fetch_tok(record):
-                    #print(f"Get Token: {token}")
-                    token.print(0)
-            #record.print(AU_OFLAG_RAW)
-        except Exception as e:
-            print(f"Error: {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        raise SystemExit("Usage: program [options] <path>")
+
+    oflags = AU_OFLAG_NONE
+    options = sys.argv[1:-1]
+    for option in options:
+        if option == "-r":
+            oflags |= AU_OFLAG_RAW
+    path = sys.argv[-1]
+    # print(f"oflags: {oflags}, path: {path}")
+    with open(path, "rb") as f:
+        for record in au_read_rec(f):
+            for token in record.tokens:
+                token.print(oflags)
