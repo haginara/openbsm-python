@@ -7,10 +7,11 @@ from collections import OrderedDict, namedtuple
 from datetime import datetime
 from typing import List, Dict, Optional, Any, Type, TypeVar
 
-from audit_event import AUDIT_EVENT, get_audit_events
-from bsm_token import *
-from bsm_h import *
-from audit_record import *
+from .audit_event import AUDIT_EVENT, get_audit_events
+from .bsm_token import *
+from .bsm_h import *
+from .audit_record import *
+from .argtypes import *
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,11 @@ def fetch_token(token_id: int, record: Rec) -> Optional[BaseToken]:
 
 
 class Record:
+    DUMP_COM = 0
+    DUMP_RAW = 1
+    DUMP_XML = 2
+    DUMP_JSON = 3
+
     def __init__(self, data):
         self.data = data
         self.length = len(data)
@@ -98,10 +104,78 @@ class Record:
                 )
             logger.debug(f"Total: {self.length}, read: {self.bytesread}")
 
+    def asdict(self):
+        """
+        XML
+        <record version="11" event="audit crash recovery" modifier="0" time="Tue Nov  5 22:14:41 2019" msec=" + 945 msec" >
+            <text>launchd::Audit recovery</text>
+            <path>/var/audit/20191104194608.crash_recovery</path>
+            <return errval="success" retval="0" />
+            <identity signer-type="1" signing-id="com.apple.xpc.launchd" signing-id-truncated="no" team-id="" team-id-truncated="no" cdhash="0x2623e0657eb3c1c063dec9aeef40a0ce175d1ec9" />
+        </record>
+        JSON
+        {
+            "record": {
+                "text": "launchd::Audit recovery",
+                "path": "/var/audit/20191104194608.crash_recovery",
+                "return": {
+                    "_errval": "success",
+                    "_retval": "0"
+                },
+                "identity": {
+                    "_signer-type": "1",
+                    "_signing-id": "com.apple.xpc.launchd",
+                    "_signing-id-truncated": "no",
+                    "_team-id": "",
+                    "_team-id-truncated": "no",
+                    "_cdhash": "0x2623e0657eb3c1c063dec9aeef40a0ce175d1ec9"
+                },
+                "_version": "11",
+                "_event": "audit crash recovery",
+                "_modifier": "0",
+                "_time": "Tue Nov  5 22:14:41 2019",
+                "_msec": " + 945 msec"
+            }
+        }
+        {
+            "record": {
+                "size": "158",
+                "version": "11",
+                "event_type": "audit crash recovery",
+                "modifier": "0",
+                "time": "Tue Nov  5 22:14:41 2019",
+                "msec": " + 945 msec",
+                "text": {
+                    "data": "launchd::Audit recovery"
+                },
+                "path": {
+                    "data": "/var/audit/20191104194608.crash_recovery"
+                },
+                "return": {
+                    "errno": "success",
+                    "value": "0"
+                },
+                "identity": {
+                    "signer_type": "1",
+                    "signing_id": "com.apple.xpc.launchd",
+                    "signing_id_truncated": "complete",
+                    "team_id": "",
+                    "team_id_truncated": "complete",
+                    "cbhash": "0x2623e0657eb3c1c063dec9aeef40a0ce175d1ec9"
+                }
+            }
+        }
+        """
+        # token[0] is Header
+        # token[-1] is Trailer
+        data = {"record": self.tokens[0].asdict()}
+        data["record"].update(
+            {token.identifier: token.asdict() for token in self.tokens[1:-1]}
+        )
+        return data
+
 
 # AUT_HEADER32, AUT_HEADER32_EX, AUT_HEADER64, AUT_HEADER64_EX
-
-
 def au_fetch_invalid_tok(record: Record):
     err = 0
     recoversize = record.length - (record.bytesread + AUDIT_TRAILER_SIZE)

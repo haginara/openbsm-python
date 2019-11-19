@@ -1,7 +1,8 @@
 import os
 from typing import List
 from collections import namedtuple
-from bsm_h import AUDIT_EVENT_FILE
+
+from .bsm_h import AUDIT_EVENT_FILE
 
 
 AUDIT_EVENT = namedtuple("AuditEvent", "event_id identifier entry flags")
