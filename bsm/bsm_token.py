@@ -5,6 +5,7 @@ import logging
 import time
 import pwd
 import grp
+
 from collections import OrderedDict, namedtuple
 from datetime import datetime
 from typing import List, Dict, Optional, Any, Type, TypeVar
@@ -25,7 +26,7 @@ Token = TypeVar("Token", bound="BaseToken")
 Rec = TypeVar("Record", bound="Record")
 
 
-class NotYetImplementedToken(Exception):
+class NotImplementedToken(Exception):
     pass
 
 

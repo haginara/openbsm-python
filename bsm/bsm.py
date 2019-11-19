@@ -93,7 +93,7 @@ class Record:
                 logger.debug(f"{token}")
                 self.tokens.append(token)
             else:
-                raise NotYetImplementedToken(
+                raise NotImplementedToken(
                     f"NotYeImplementedToken: 0x{token_id:x}, reamins: {self.remains()}"
                 )
             logger.debug(f"Total: {self.length}, read: {self.bytesread}")
@@ -120,6 +120,8 @@ def au_read_rec(fp):
         SIZE_OF_RECORD: sizeof(uint_32)
         TOKENS: SIZE_OF_RECORD - szieof(BSM_TYPE) - sizeof(SIZE_OF_RECORD)
     """
+    # TODO: Partial read
+
     while True:
         _bsm_type = fp.read(1)
         if not _bsm_type:
@@ -138,8 +140,10 @@ def au_read_rec(fp):
             data = fp.read(recsize)
             yield Record(_bsm_type + _recsize + data)
         elif bsm_type == AUT_OTHER_FILE32:
+            # TODO: OTHER_FILE32
             pass
         else:
+            # TODO: fetch_invalid_tok
             # sec
             # msec
             # filenamelen
