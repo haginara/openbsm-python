@@ -58,16 +58,22 @@ def main():
 
     oflags = AU_OFLAG_NONE
     if options.raw:
-        oflags |= AU_OFLAG_RAW
+        oflags |= Record.DUMP_RAW
     elif options.short:
-        oflags |= AU_OFLAG_SHORT
+        oflags |= Record.DUMP_SHORT
     elif options.xml:
-        oflags |= AU_OFLAG_XML
+        oflags |= Record.DUMP_XML
+    elif options.xml:
+        oflags |= Record.DUMP_JSON
 
     with open(options.path, "rb") as f:
-        data = [record.asdict() for record in au_read_rec(f)]
-        import json
-        print(json.dumps(data, indent=2))
+        if oflags & Record.DUMP_JSON: 
+            data = [record.asdict() for record in au_read_rec(f)]
+            import json
+            print(json.dumps(data, indent=2))
+        else:
+            for record in au_read_rec(f):
+                record.print(oflags)
 
 if __name__ == "__main__":
     main()

@@ -59,10 +59,13 @@ def fetch_token(token_id: int, record: Rec) -> Optional[BaseToken]:
 
 
 class Record:
-    DUMP_COM = 0
-    DUMP_RAW = 1
-    DUMP_XML = 2
-    DUMP_JSON = 3
+    DUMP_COM        = 0x0000
+    DUMP_RAW        = 0x0001
+    DUMP_SHORT      = 0x0002
+    DUMP_XML        = 0x0004
+    DUMP_NORESOLVE  = 0x0008
+    DUMP_JSON       = 0x0010
+
 
     def __init__(self, data):
         self.data = data
@@ -103,6 +106,10 @@ class Record:
                     f"NotYeImplementedToken: 0x{token_id:x}, reamins: {self.remains()}"
                 )
             logger.debug(f"Total: {self.length}, read: {self.bytesread}")
+
+    def print(self, oflags: int):
+        for token in self.tokens:
+            token.print(oflags)
 
     def asdict(self):
         """
