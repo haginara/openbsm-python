@@ -8,6 +8,9 @@ from .bsm_h import *
 from .bsm_errors import BSM_ERRORS
 from .audit_record import *
 
+from .lib.libproc import proc_pidpath
+
+
 AUDIT_EVENTS = get_audit_events()
 
 class ArgType(object):
@@ -109,3 +112,11 @@ class Ipv4Address(ArgType):
             f"{int(self._intip / pow(2, 8)) % 256}."
             f"{int(self._intip) % 256}"
         )
+
+
+class Process(ArgType):
+    def __init__(self, pid):
+        self._pid = pid
+    
+    def __repr__(self):
+        return f"{self._pid}({proc_pidpath(self._pid)})"

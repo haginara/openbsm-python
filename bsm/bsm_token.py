@@ -350,7 +350,7 @@ class Subject(BaseToken):
         self.add_argument("egid", "I", argtype=Group)
         self.add_argument("ruid", "I", argtype=User)
         self.add_argument("rgid", "I", argtype=Group)
-        self.add_argument("pid", "I", argtype=int)
+        self.add_argument("pid", "I", argtype=Process)
         self.add_argument("sid", "I", argtype=int)
 
 
