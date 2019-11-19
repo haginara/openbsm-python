@@ -194,7 +194,7 @@ def au_fetch_invalid_tok(record: Record):
     return 0
 
 
-def au_read_rec(fp):
+def au_read_rec(fp, partial :bool=False):
     """ Read Record from audit file
 
         BSM_TYPE: sizeof(byte)
@@ -202,20 +202,24 @@ def au_read_rec(fp):
         TOKENS: SIZE_OF_RECORD - szieof(BSM_TYPE) - sizeof(SIZE_OF_RECORD)
     """
     # TODO: Partial read
-
     while True:
-        _bsm_type = fp.read(1)
-        if not _bsm_type:
-            break
+        if partial:
+            _bsm_type = b'\x14'
+            partial = False
+        else:
+            _bsm_type = fp.read(1)
+            if not _bsm_type:
+                return
         bsm_type = struct.unpack(">B", _bsm_type)[0]
         if bsm_type in AUT_HEADERS:
             _recsize = fp.read(4)
             recsize = struct.unpack(">I", _recsize)[0]
-            if recsize < struct.calcsize("I") + struct.calcsize("b"):
+            if recsize < struct.calcsize(">IB"):
                 return None
             logger.debug(
                 f"bsm_type: {bsm_type}({struct.calcsize('>B')}),"
-                f"recsize: {recsize}({struct.calcsize('>I')})"
+                f"recsize: {recsize}({struct.calcsize('>I')}),"
+                f"_recsize: {_recsize}"
             )
             recsize = recsize - struct.calcsize(">BI")
             data = fp.read(recsize)

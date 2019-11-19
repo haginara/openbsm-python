@@ -16,6 +16,7 @@ from .argtypes import *
 
 logger = logging.getLogger(__name__)
 
+#https://github.com/openbsm/openbsm/blob/master/libbsm/bsm_io.c
 
 AUDIT_HEADER_SIZE = 18
 AUDIT_TRAILER_SIZE = 7
@@ -400,3 +401,30 @@ class Subject32_Ex(Subject):
         self.add_argument("tid_type", "I", argtype=int, show=False)
         # Not Support ipv6 yet
         self.add_argument("tid_addr", "I", argtype=Ipv4Address)
+
+
+class Attr(BaseToken):
+    """
+    * file access mode        4 bytes
+    * owner user ID           4 bytes
+    * owner group ID          4 bytes
+    * file system ID          4 bytes
+    * node ID                 8 bytes
+    * device                  4 bytes/8 bytes (32-bit/64-bit)
+    """
+    token_id = AUT_ATTR
+    identifier = "attribute"
+
+    def _setup(self):
+        self.add_argument('mode', "I", argtype=int)
+        self.add_argument('uid', "I", argtype=int)
+        self.add_argument('gid', "I", argtype=int)
+        self.add_argument('fsid', "I", argtype=int)
+        self.add_argument('nodeid', "I", argtype=int)
+        self.add_argument('device', "I", argtype=int)
+
+class Attr32(Attr):
+    token_id = AUT_ATTR32
+
+class Attr64(Attr):
+    token_id = AUT_ATTR64
