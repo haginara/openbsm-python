@@ -96,14 +96,14 @@ class Record:
             token_id = self.next_token_id()
             if token_id == 0:
                 break
-            logger.debug(f"{token_id}")
+            logger.debug(f"token_id: {token_id}-0x{token_id:x}")
             token = fetch_token(token_id, self)
             if token:
-                logger.debug(f"{token}")
+                logger.debug(f"TOKEN: {token_id:x}: {token}")
                 self.tokens.append(token)
             else:
                 raise NotImplementedToken(
-                    f"NotYeImplementedToken: 0x{token_id:x}, reamins: {self.remains()}"
+                    f"NotImplementedToken: 0x{token_id:x}, reamins: {self.remains()}"
                 )
             logger.debug(f"Total: {self.length}, read: {self.bytesread}")
 

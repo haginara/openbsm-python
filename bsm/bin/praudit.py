@@ -15,7 +15,7 @@ import pprint
 import argparse
 import logging
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 def get_options(argv):
     parser = argparse.ArgumentParser()
@@ -85,10 +85,6 @@ def get_ioctl_fd(filepath: str):
     selectMode = au_mask_t()
     if (ioctl (auditPipe, AUDITPIPE_GET_PRESELECT_FLAGS, selectMode) < 0):
         return 4
-    
-    #queueLimit = array.array('I', [0])
-    #if (ioctl (auditPipe, AUDITPIPE_GET_QLIMIT, queueLimit) < 0):
-    #    return 4
 
     queueLimitMax = array.array('I', [0])
     if (ioctl (auditPipe, AUDITPIPE_GET_QLIMIT_MAX, queueLimitMax) < 0):
@@ -103,15 +99,11 @@ def get_ioctl_fd(filepath: str):
     if (ioctl (auditPipe, AUDITPIPE_SET_PRESELECT_NAFLAGS, selectMode) < 0):
         return 4
 
-    
-    #fo = os.fdopen(auditPipe, "rb+")
-    logger.info(f"auditPipe: {auditPipe}, {f.tell()}")
-    #return fo
+    logger.debug(f"auditPipe: {auditPipe}, {f.tell()}")
     return f
 
 def get_fd(filepath: str):
     if filepath == '/dev/auditpipe':
-        #TODO: get fd with ioctl
         return get_ioctl_fd(filepath)
     elif filepath is None:
         return sys.stdin.buffer

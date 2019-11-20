@@ -83,6 +83,10 @@ AUT_OTHER_FILE = AUT_OTHER_FILE32
 AUT_SOCKINET32 = 0x80  # XXX
 AUT_SOCKINET128 = 0x81  # XXX
 AUT_SOCKUNIX = 0x82  # XXX
+_AUT_RIGHTS =		0x83		# XXX FreeBSD
+AUT_ARG_UUID =		0x84		# UUID of argument object
+AUT_RETURN_UUID =		0x85	# UUID of returned object
+
 #
 
 # Apple specific tokens

@@ -110,7 +110,7 @@ class BaseToken(metaclass=TokenFetcher):
         return sum([struct.calcsize(self.args[key][0]) for key in self.args])
 
     def __str__(self):
-        return f"{self.__delm__}".join(
+        return f"{self.token_id}{self.__delm__}".join(
             [f"{getattr(self, arg[0])}" for arg in self.args]
         )
 
@@ -252,12 +252,10 @@ class Trailer(BaseToken):
 
 class Argument(BaseToken):
     """
-    /*
     * argument #              1 byte
     * argument value          4 bytes/8 bytes (32-bit/64-bit value)
     * text length             2 bytes
     * text                    N bytes + 1 terminating NULL byte
-    */
     """
 
     token_id = AUT_ARG
@@ -302,19 +300,38 @@ class Path(Text):
     identifier = "path"
 
 
-class Return32(BaseToken):
-    """
-        "errno": ">B",
-        "value": ">I",
-    """
-
-    token_id = AUT_RETURN32
+class Return(BaseToken):
     identifier = "return"
 
     def _setup(self):
         self.add_argument("errno", "B", argtype=ReturnString)
+       
+
+class Return32(Return):
+    """
+        "errno": ">B",
+        "value": ">I",
+    """
+    token_id = AUT_RETURN32
+    
+    def _setup(self):
+        super()._setup()
         self.add_argument("value", "I", argtype=int)
 
+class Return64(Return):
+    token_id = AUT_RETURN64
+
+    def _setup(self):
+        super()._setup()
+        self.add_argument("value", "Q", argtype=int)
+
+class ReturnUuid(Return):
+    token_id = AUT_RETURN_UUID
+    identifier = "ret_uuid"
+    def _setup(self):
+        super()._setup()
+        self.add_argument("uuid_be", "sizeof_uuid", argtype='uuid')
+        self.add_argument("uuid", "{length}s", len_fmt="H", argtype=String)
 
 class Identity(BaseToken):
     """
@@ -402,6 +419,13 @@ class Subject32_Ex(Subject):
         # Not Support ipv6 yet
         self.add_argument("tid_addr", "I", argtype=Ipv4Address)
 
+#TODO: Complete Subject64
+class Subject64(Subject):
+    token_id = AUT_SUBJECT64
+
+#TODO: Complete Subject64Ex
+class Subject64Ex(Subject):
+    token_id = AUT_SUBJECT64_EX
 
 class Attr(BaseToken):
     """
@@ -420,7 +444,7 @@ class Attr(BaseToken):
         self.add_argument('uid', "I", argtype=int)
         self.add_argument('gid', "I", argtype=int)
         self.add_argument('fsid', "I", argtype=int)
-        self.add_argument('nodeid', "I", argtype=int)
+        self.add_argument('nodeid', "Q", argtype=int)
         self.add_argument('device', "I", argtype=int)
 
 class Attr32(Attr):
@@ -428,3 +452,365 @@ class Attr32(Attr):
 
 class Attr64(Attr):
     token_id = AUT_ATTR64
+
+
+class Opaque(BaseToken):
+    token_id = AUT_OPAQUE
+    identifier = "opaque"
+
+    def _setup(self):
+        self.add_argument("data", "{length}s", len_fmt="H", argtype=ByteString)
+
+class Uuid(BaseToken):
+    toekn_id = AUT_ARG_UUID
+    identifier = "uuid"
+
+class Exit(BaseToken):
+    """
+    * status                  4 bytes
+    * return value            4 bytes
+    """
+    token_id = AUT_EXIT
+    identifier = "exit"
+
+    def _setup(self):
+        self.add_argument('errval', 'I', argtype=int)
+        self.add_argument('retval', 'I', argtype=int)
+
+class ExecArgs(BaseToken):
+    """
+     * count                   4 bytes
+    * text                    count null-terminated string(s)
+    fetch_execarg_tok(tokenstr_t *tok, u_char *buf, int len)
+{
+	int err = 0;
+	u_int32_t i;
+	u_char *bptr;
+
+	READ_TOKEN_U_INT32(buf, len, tok->tt.execarg.count, tok->len, err);
+	if (err)
+		return (-1);
+
+	for (i = 0; i < tok->tt.execarg.count; i++) {
+		bptr = buf + tok->len;
+		if (i < AUDIT_MAX_ARGS)
+			tok->tt.execarg.text[i] = (char*)bptr;
+
+		/* Look for a null terminated string. */
+		while (bptr && (*bptr != '\0')) {
+			if (++tok->len >= (u_int32_t)len)
+				return (-1);
+			bptr = buf + tok->len;
+		}
+		if (!bptr)
+			return (-1);
+		tok->len++; /* \0 character */
+	}
+	if (tok->tt.execarg.count > AUDIT_MAX_ARGS)
+		tok->tt.execarg.count = AUDIT_MAX_ARGS;
+
+	return (0);
+}
+    """
+    token_id = AUT_EXEC_ARGS
+    identifier = "exec arg"
+
+    def _setup(self):
+        self.add_argument("")
+
+class ExecEnv(BaseToken):
+    """
+    fetch_execenv_tok(tokenstr_t *tok, u_char *buf, int len)
+{
+	int err = 0;
+	u_int32_t i;
+	u_char *bptr;
+
+	READ_TOKEN_U_INT32(buf, len, tok->tt.execenv.count, tok->len, err);
+	if (err)
+		return (-1);
+
+	for (i = 0; i < tok->tt.execenv.count; i++) {
+		bptr = buf + tok->len;
+		if (i < AUDIT_MAX_ENV)
+			tok->tt.execenv.text[i] = (char*)bptr;
+
+		/* Look for a null terminated string. */
+		while (bptr && (*bptr != '\0')) {
+			if (++tok->len >= (u_int32_t)len)
+				return (-1);
+			bptr = buf + tok->len;
+		}
+		if (!bptr)
+			return (-1);
+		tok->len++; /* \0 character */
+	}
+	if (tok->tt.execenv.count > AUDIT_MAX_ENV)
+		tok->tt.execenv.count = AUDIT_MAX_ENV;
+
+	return (0);
+    """
+    token_id = AUT_EXEC_ENV
+    identifier = "exec env"
+
+class OtherFile(BaseToken):
+    """
+    * seconds of time          4 bytes
+    * milliseconds of time     4 bytes
+    * file name len            2 bytes
+    * file pathname            N bytes + 1 terminating NULL byte
+    """
+    token_id = AUT_OTHER_FILE32
+    identifier = "file"
+
+    def _setup(self):
+        self.add_argument("time", "I", argtype=int)
+        self.add_argument("msec", "I", argtype=MSec)
+        self.add_argument("pathname", "{length}s", len_fmt="H", argtype=String)
+
+
+class Groups(ArgType):
+    def __init__(self, groups):
+        self._groups = groups
+
+class NewGroups(BaseToken):
+    """
+     * number groups           2 bytes
+    * group list              count * 4 bytes
+    """
+    token_id = AUT_NEWGROUPS
+    identifier = "group"
+    
+    def _setup(self):
+        self.add_argument("groups", "{count}I", argtype=Groups)
+
+class InAddr(BaseToken):
+    """
+     * Internet addr 4 bytes
+    """
+    token_id = AUT_IN_ADDR
+    identifier = "ip addr"
+
+    def _setup(self):
+        self.add_argument("addr", "I", argtype=Ipv4Address)
+
+class InAddrEx(BaseToken):
+    """
+    type 4 bytes
+    address 16 bytes
+    """
+    token_id = AUT_IN_ADDR_EX
+    identifier = "ip addr ex"
+    
+    def _setup(self):
+        self.add_arguemnt("ad_type", "I", argtype=int)
+        self.add_argument("address", "Q", argtype=int) # print_ip_ex_address
+
+class Ip(BaseToken):
+    """
+    ip header 20 bytes
+    """
+    token_id = AUT_IP
+    identifier = "ip"
+
+    def _setup(self):
+        self.add_argument("version", "B", argtype=int)
+        self.add_argument("tos", "B", argtype=int)
+        self.add_argument("len", "H", argtype=int)
+        self.add_argument("id", "H", argtype=int)
+        self.add_argument("offset", "H", argtype=int)
+        self.add_argument("ttl", "B", argtype=int)
+        self.add_argument("prot", "B", argtype=int)
+        self.add_argument("chksm", "H", argtype=int)
+        self.add_argument("src", "I", argtype=int)
+        self.add_argument("dest", "I", argtype=int)
+
+class Ipc(BaseToken):
+    """
+     * object ID type       1 byte
+    * Object ID            4 bytes
+    """
+    token_id = AUT_IPC
+    identifier = "ipc"
+
+    def _setup(self):
+        self.add_argument("ipc_type", "B", argtype=int)
+        self.add_arguemnt("ipc_id", "I", argtype=int)
+
+class IpcPerm(BaseToken):
+    """
+     * owner user id        4 bytes
+    * owner group id       4 bytes
+    * creator user id      4 bytes
+    * creator group id     4 bytes
+    * access mode          4 bytes
+    * slot seq                     4 bytes
+    * key                          4 bytes
+    """
+    token_id = AUT_IPC_PERM
+    identifier = "IPC perm"
+
+    def _setup(self):
+        self.add_argument("uid", "I", argtype=int)
+        self.add_argument("gid", "I", argtype=int)
+        self.add_argument("puid", "I", argtype=int)
+        self.add_argument("pgid", "I", argtype=int)
+        self.add_argument("mode", "I", argtype=int)
+        self.add_argument("seq", "I", argtype=int)
+        self.add_argument("key", "I", argtype=int)
+
+
+class Iport(BaseToken):
+    """
+     * port Ip address  2 bytes
+    """
+    token_id = AUT_IPORT
+    identifier = "ip port"
+
+    def _setup(self):
+        self.add_argument("port", "H", argtype=int)
+
+
+class Process32(Subject32):
+    """
+     * token ID                     1 byte
+    * audit ID                     4 bytes
+    * euid                         4 bytes
+    * egid                         4 bytes
+    * ruid                         4 bytes
+    * rgid                         4 bytes
+    * pid                          4 bytes
+    * sessid                       4 bytes
+    * terminal ID
+    *   portid             4 bytes
+    *   machine id         4 bytes
+    """
+    token_id = AUT_PROCESS32
+    identifier = "process"
+
+class Process32Ex(Subject32_Ex):
+    """
+    * token ID                1 byte
+    * audit ID                4 bytes
+    * effective user ID       4 bytes
+    * effective group ID      4 bytes
+    * real user ID            4 bytes
+    * real group ID           4 bytes
+    * process ID              4 bytes
+    * session ID              4 bytes
+    * terminal ID
+    *   port ID               4 bytes
+    *   address type-len      4 bytes
+    *   machine address      16 bytes
+    """
+    token_id = AUT_PROCESS32_EX
+    identifier = "process"
+
+class Process64(Subject):
+    """
+    * token ID                     1 byte
+    * audit ID                     4 bytes
+    * euid                         4 bytes
+    * egid                         4 bytes
+    * ruid                         4 bytes
+    * rgid                         4 bytes
+    * pid                          4 bytes
+    * sessid                       4 bytes
+    * terminal ID
+    *   portid             8 bytes
+    *   machine id         4 bytes
+    */
+    """
+    token_id = AUT_PROCESS64
+    identifier = "process"
+
+    def _setup(self):
+        super()._setup()
+        self.add_argument("tid_port", "Q", argtype=int)
+        self.add_argument("tid_address", "I", argtype=IPv4Address)
+
+class Process64Ex(Subject):
+    """
+    * token ID                1 byte
+    * audit ID                4 bytes
+    * effective user ID       4 bytes
+    * effective group ID      4 bytes
+    * real user ID            4 bytes
+    * real group ID           4 bytes
+    * process ID              4 bytes
+    * session ID              4 bytes
+    * terminal ID
+    *   port ID               8 bytes
+    *   address type-len      4 bytes
+    *   machine address      16 bytes
+    """
+    token_id = AUT_PROCESS64_EX
+    identifier = "process"
+
+    def _setup(self):
+        super()._setup()
+        self.add_argument("tid_port", "Q", argtype=int)
+        self.add_argument("tid_addr_type", "I", argtype=int)
+        self.add_argument("tid_address", "2Q", argtype=int)
+
+
+class Seq(BaseToken):
+    token_id = AUT_SEQ
+    identifier = "sequence"
+
+    def _setup(self):
+        self.add_argument("seqno", "I", argtype=int)
+
+
+class Socket(BaseToken):
+    """
+    * socket type             2 bytes
+    * local port              2 bytes
+    * local address           4 bytes
+    * remote port             2 bytes
+    * remote address          4 bytes
+    """    
+    token_id = AUT_SOCKET
+    identifier = "socket"
+
+    def _setup(self):
+        self.add_argument("sock_type", "H", argtype=int)
+        self.add_argument("l_port", "H", argtype=int)
+        self.add_arguemnt("l_addr", "I", argtype=IPv4Address)
+        self.add_argument("r_port", "H", argtype=int)
+        self.add_arguemnt("r_addr", "I", argtype=IPv4Address)
+    
+
+class SockInet32(BaseToken):
+    """
+    * socket family           2 bytes
+    * local port              2 bytes
+    * socket address          4 bytes
+    """
+    token_id = AUT_SOCKINET32
+    identifier = "socket-inet"
+
+    def _setup(self):
+        self.add_argument("family", "H", argtype=int)
+        self.add_argument("port", "H", argtype=int)
+        self.add_arguemnt("address", "I", argtype=IPv4Address)
+
+#TODO: Complete Token classes
+"""
+    token_id = AUT_SOCKUNIX:
+    token_id = AUT_SOCKINET128:
+
+    token_id = AUT_SOCKET_EX:
+    
+
+    token_id = AUT_DATA:
+    
+
+    token_id = AUT_ZONENAME:
+    
+
+    token_id = AUT_UPRIV:
+    
+
+    token_id = AUT_PRIV:
+"""
