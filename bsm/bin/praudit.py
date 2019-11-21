@@ -69,18 +69,17 @@ def get_ioctl_fd(filepath: str):
     selectMode = array.array('i', [0])
     if (ioctl (auditPipe, AUDITPIPE_GET_PRESELECT_MODE, selectMode) < 0):
         return 4
-    logger.info(f"AUDITPIPE_GET_PRESELECT_MODE: {AUDITPIPE_GET_PRESELECT_MODE:x}, selectMode: {selectMode}")
     
     selectMode = array.array('i', [AUDITPIPE_PRESELECT_MODE_LOCAL])
     if (ioctl (auditPipe, AUDITPIPE_SET_PRESELECT_MODE, selectMode, 1) < 0):
         return 4
 
     selectMode = au_mask_t()
-    selectMode.am_success = 0xffffffff
-    selectMode.am_failure = 0xffffffff
+    selectMode.am_success = AUDIT_ALL_fALGS
+    selectMode.am_failure = AUDIT_ALL_fALGS
     if (ioctl (auditPipe, AUDITPIPE_SET_PRESELECT_FLAGS, selectMode) < 0):
         return 4
-    logger.info(f"AUDITPIPE_SET_PRESELECT_FLAGS: {AUDITPIPE_SET_PRESELECT_FLAGS:x}, selectMode: {selectMode.am_success}, {selectMode.am_failure}")
+    logger.debug(f"AUDITPIPE_SET_PRESELECT_FLAGS: {AUDITPIPE_SET_PRESELECT_FLAGS:x}, selectMode: {selectMode.am_success}, {selectMode.am_failure}")
     
     selectMode = au_mask_t()
     if (ioctl (auditPipe, AUDITPIPE_GET_PRESELECT_FLAGS, selectMode) < 0):
@@ -91,12 +90,6 @@ def get_ioctl_fd(filepath: str):
         return 4
 
     if (ioctl (auditPipe, AUDITPIPE_SET_QLIMIT, queueLimitMax) < 0):
-        return 4
-
-    selectMode = au_mask_t()
-    selectMode.am_success = 0xffffffff
-    selectMode.am_failure = 0xffffffff
-    if (ioctl (auditPipe, AUDITPIPE_SET_PRESELECT_NAFLAGS, selectMode) < 0):
         return 4
 
     logger.debug(f"auditPipe: {auditPipe}, {f.tell()}")
