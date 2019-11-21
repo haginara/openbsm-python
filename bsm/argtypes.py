@@ -101,7 +101,7 @@ class Group(ArgType):
         return grp.getgrgid(self._gid).gr_name
 
 
-class Ipv4Address(ArgType):
+class IPv4Address(ArgType):
     def __init__(self, intip):
         self._intip = intip
 

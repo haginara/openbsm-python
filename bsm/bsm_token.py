@@ -231,7 +231,7 @@ class Header32_Ex(Header):
     def _setup(self):
         super()._setup()
         self.add_argument("ad_type", "I", argtype=int)
-        self.add_argument("address", "I", argtype=Ipv4Address)
+        self.add_argument("address", "I", argtype=IPv4Address)
         self.add_argument("time", "I", argtype=DateTime)
         self.add_argument("msec", "I", argtype=MSec)
 
@@ -391,7 +391,7 @@ class Subject32(Subject):
     def _setup(self):
         super()._setup()
         self.add_argument("tid_port", "I", argtype=int)
-        self.add_argument("tid_address", "I", argtype=Ipv4Address)
+        self.add_argument("tid_address", "I", argtype=IPv4Address)
 
 
 class Subject32_Ex(Subject):
@@ -417,7 +417,7 @@ class Subject32_Ex(Subject):
         self.add_argument("tid_port", "I", argtype=int)
         self.add_argument("tid_type", "I", argtype=int, show=False)
         # Not Support ipv6 yet
-        self.add_argument("tid_addr", "I", argtype=Ipv4Address)
+        self.add_argument("tid_addr", "I", argtype=IPv4Address)
 
 #TODO: Complete Subject64
 class Subject64(Subject):
@@ -592,7 +592,7 @@ class InAddr(BaseToken):
     identifier = "ip addr"
 
     def _setup(self):
-        self.add_argument("addr", "I", argtype=Ipv4Address)
+        self.add_argument("addr", "I", argtype=IPv4Address)
 
 class InAddrEx(BaseToken):
     """
@@ -796,21 +796,110 @@ class SockInet32(BaseToken):
         self.add_arguemnt("address", "I", argtype=IPv4Address)
 
 #TODO: Complete Token classes
-"""
-    token_id = AUT_SOCKUNIX:
-    token_id = AUT_SOCKINET128:
 
-    token_id = AUT_SOCKET_EX:
+class SockUnix(BaseToken):
+    """
+    * socket family           2 bytes
+    * path                    (up to) 104 bytes + NULL (NULL terminated string).
+    """
+    token_id = AUT_SOCKUNIX
+    identifier = "socket-unix"
+
+    def _setup(self):
+        self.add_argument("addr_type", "H", argtype=int)
+        self.add_argument("path", "s", argtype=String)
+
+class SockInet128(BaseToken):
+    """
+    * socket family	 2 bytes
+    * local port		 2 bytes
+    * socket address	16 bytes
+    """
+    token_id = AUT_SOCKINET128
+    identifier = "socket-inet6"
+
+    def _setup(self):
+        self.add_argument("sock_type", "H", argtype=int)
+        self.add_argument("port", "H", argtype=int)
+        self.add_argument("addr", "Q", argtype=int)
+
+class SocketEx(BaseToken):
+    """
+    * socket domain           2 bytes
+    * socket type             2 bytes
+    * address type            2 bytes
+    * local port              2 bytes
+    * local Internet address  4/16 bytes
+    * remote port             2 bytes
+    * remote Internet address 4/16 bytes
+    """
+    token_id = AUT_SOCKET_EX
+    identifier = "socket"
+
+    def _setup(self):
+        self.add_argument("domain", "H", argtype=int)
+        self.add_argument("sock_type", "H", argtype=int)
+        self.add_argument("addr_type", "H", argtype=int)
+        self.add_argument("l_port", "H", argtype=int)
+        self.add_argument("l_addr", "I", argtype=IPv4Address)
+        self.add_argument("r_port", "H", argtype=int)
+        self.add_argument("r_addr", "I", argtype=IPv4Address)
     
 
-    token_id = AUT_DATA:
+class Arb(BaseToken):
+    """
+    * how to print            1 byte
+    * basic unit              1 byte
+    * unit count              1 byte
+    * data items              (depends on basic unit)
+    """
+    token_id = AUT_DATA
+    identifier = "arbitrary"
+
+    def _setup(self):
+        self.add_argument("howtopr", "H", argtype=int)
+        self.add_argument("bu", "H", argtype=int)
+        self.add_argument("uc", "H", argtype=int)
+        self.add_argument("data", "{}s", argtype=String)
+
+
+class Zonename(BaseToken):
+    """
+    * size                         2 bytes;
+    * zonename                     size bytes;
+    """
+    token_id = AUT_ZONENAME
+    identifier = "zone"
+
+    def _setup(self):
+        self.add_argument("zoename", "{len}s", len_fmt="H", argtype=String)
+    
+class Upriv(BaseToken):
+    """
+    * status                       1 byte
+    * privstrlen                   2 bytes
+    * priv                         N bytes + 1 (\0 byte)
+    """
+    token_id = AUT_UPRIV
+    identifier = "use of privilege"
+
+    def _setup(self):
+        self.add_argument("status", "B", type=int)
+        self.add_argument("priv", "{len}s", len_fmt="H", argtype=String)
     
 
-    token_id = AUT_ZONENAME:
-    
+class Priv(BaseToken):
+    """
+    /*
+    * privtstrlen		1 byte
+    * privtstr		N bytes + 1
+    * privstrlen		1 byte
+    * privstr		N bytes + 1
+    */
+    """
+    token_id = AUT_PRIV
+    identifier = "priv"
 
-    token_id = AUT_UPRIV:
-    
-
-    token_id = AUT_PRIV:
-"""
+    def _setup(self):
+        self.add_argument("privset", "{len}s", len_fmt="H", type=String)
+        self.add_argument("privstr", "{len}s", lem_fmt="H", type=String)
