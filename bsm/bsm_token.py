@@ -446,7 +446,7 @@ class Exit(BaseToken):
         self.add_argument('retval', argtype=UInt32)
 
 class ExecArgs(BaseToken):
-    """
+    """ TODO:
      * count                   4 bytes
     * text                    count null-terminated string(s)
     fetch_execarg_tok(tokenstr_t *tok, u_char *buf, int len)
@@ -487,7 +487,7 @@ class ExecArgs(BaseToken):
         self.add_argument("")
 
 class ExecEnv(BaseToken):
-    """
+    """ TODO:
     fetch_execenv_tok(tokenstr_t *tok, u_char *buf, int len)
 {
 	int err = 0;
@@ -572,7 +572,7 @@ class InAddrEx(BaseToken):
         self.add_argument("address", argtype=IPv6Address) # print_ip_ex_address
 
 class Ip(BaseToken):
-    """
+    """ TODO:
     ip header 20 bytes
     """
     token_id = AUT_IP
@@ -591,7 +591,7 @@ class Ip(BaseToken):
         self.add_argument("dest", "I", argtype=UInt32)
 
 class Ipc(BaseToken):
-    """
+    """ TODO:
      * object ID type       1 byte
     * Object ID            4 bytes
     """
@@ -603,7 +603,7 @@ class Ipc(BaseToken):
         self.add_argument("ipc_id", "I", argtype=UInt32)
 
 class IpcPerm(BaseToken):
-    """
+    """ TODO:
      * owner user id        4 bytes
     * owner group id       4 bytes
     * creator user id      4 bytes
@@ -626,7 +626,7 @@ class IpcPerm(BaseToken):
 
 
 class Iport(BaseToken):
-    """
+    """ TODO:
      * port Ip address  2 bytes
     """
     token_id = AUT_IPORT
@@ -637,7 +637,7 @@ class Iport(BaseToken):
 
 
 class Process32(Subject32):
-    """
+    """ TODO:
      * token ID                     1 byte
     * audit ID                     4 bytes
     * euid                         4 bytes
@@ -654,7 +654,7 @@ class Process32(Subject32):
     identifier = "process"
 
 class Process32Ex(Subject32_Ex):
-    """
+    """ TODO:
     * token ID                1 byte
     * audit ID                4 bytes
     * effective user ID       4 bytes
@@ -672,7 +672,7 @@ class Process32Ex(Subject32_Ex):
     identifier = "process"
 
 class Process64(Subject):
-    """
+    """ TODO:
     * token ID                     1 byte
     * audit ID                     4 bytes
     * euid                         4 bytes
@@ -695,7 +695,7 @@ class Process64(Subject):
         self.add_argument("tid_address", "I", argtype=IPv4Address)
 
 class Process64Ex(Subject):
-    """
+    """ TODO:
     * token ID                1 byte
     * audit ID                4 bytes
     * effective user ID       4 bytes
@@ -724,7 +724,7 @@ class Seq(BaseToken):
     identifier = "sequence"
 
     def _setup(self):
-        self.add_argument("seqno", "I", argtype=UInt32)
+        self.add_argument("seqno", argtype=UInt32)
 
 
 class Socket(BaseToken):
@@ -739,11 +739,11 @@ class Socket(BaseToken):
     identifier = "socket"
 
     def _setup(self):
-        self.add_argument("sock_type", "H", argtype=UInt32)
-        self.add_argument("l_port", "H", argtype=UInt32)
-        self.add_argument("l_addr", "I", argtype=IPv4Address)
-        self.add_argument("r_port", "H", argtype=UInt32)
-        self.add_argument("r_addr", "I", argtype=IPv4Address)
+        self.add_argument("sock_type", argtype=UInt16)
+        self.add_argument("l_port", argtype=UInt16)
+        self.add_argument("l_addr", argtype=IPv4Address)
+        self.add_argument("r_port", argtype=UInt16)
+        self.add_argument("r_addr", argtype=IPv4Address)
     
 
 class SockInet32(BaseToken):
@@ -756,9 +756,9 @@ class SockInet32(BaseToken):
     identifier = "socket-inet"
 
     def _setup(self):
-        self.add_argument("family", "H", argtype=UInt32)
-        self.add_argument("port", "H", argtype=UInt32)
-        self.add_argument("address", "I", argtype=IPv4Address)
+        self.add_argument("family", argtype=UInt16)
+        self.add_argument("port", argtype=UInt16)
+        self.add_argument("address", argtype=IPv4Address)
 
 #TODO: Complete Token classes
 
@@ -771,8 +771,8 @@ class SockUnix(BaseToken):
     identifier = "socket-unix"
 
     def _setup(self):
-        self.add_argument("addr_type", "H", argtype=UInt32)
-        self.add_argument("path", "s", argtype=String)
+        self.add_argument("addr_type", argtype=UInt16)
+        self.add_argument("path", argtype=String)
 
 class SockInet128(BaseToken):
     """
@@ -784,9 +784,9 @@ class SockInet128(BaseToken):
     identifier = "socket-inet6"
 
     def _setup(self):
-        self.add_argument("sock_type", "H", argtype=UInt32)
-        self.add_argument("port", "H", argtype=UInt32)
-        self.add_argument("addr", "Q", argtype=UInt32)
+        self.add_argument("sock_type", argtype=UInt16)
+        self.add_argument("port", argtype=UInt16)
+        self.add_argument("addr", argtype=IPAddress) # TODO: This field is dynamic field.
 
 class SocketEx(BaseToken):
     """
@@ -802,13 +802,13 @@ class SocketEx(BaseToken):
     identifier = "socket"
 
     def _setup(self):
-        self.add_argument("domain", "H", argtype=UInt32)
-        self.add_argument("sock_type", "H", argtype=UInt32)
-        self.add_argument("addr_type", "H", argtype=UInt32)
-        self.add_argument("l_port", "H", argtype=UInt32)
-        self.add_argument("l_addr", "I", argtype=IPv4Address)
-        self.add_argument("r_port", "H", argtype=UInt32)
-        self.add_argument("r_addr", "I", argtype=IPv4Address)
+        self.add_argument("domain", argtype=UInt16)
+        self.add_argument("sock_type", argtype=UInt16)
+        self.add_argument("addr_type", argtype=UInt16)
+        self.add_argument("l_port", argtype=UInt16)
+        self.add_argument("l_addr", argtype=IPAddress)  # TODO: This field is dynamic field.
+        self.add_argument("r_port", argtype=UInt16)
+        self.add_argument("r_addr", argtype=IPAddress)  # TODO: This field is dynamic field.
     
 
 class Arb(BaseToken):
@@ -822,10 +822,10 @@ class Arb(BaseToken):
     identifier = "arbitrary"
 
     def _setup(self):
-        self.add_argument("howtopr", "H", argtype=UInt32)
-        self.add_argument("bu", "H", argtype=UInt32)
-        self.add_argument("uc", "H", argtype=UInt32)
-        self.add_argument("data", "{}s", argtype=String)
+        self.add_argument("howtopr", argtype=UInt8)
+        self.add_argument("bu", argtype=UInt8)
+        self.add_argument("uc", argtype=UInt8)
+        self.add_argument("data", "{}s", argtype=String) # TODO: Depends on pre-parsed value
 
 
 class Zonename(BaseToken):
@@ -849,22 +849,22 @@ class Upriv(BaseToken):
     identifier = "use of privilege"
 
     def _setup(self):
-        self.add_argument("status", "B", type=int)
-        self.add_argument("priv", "{len}s", len_fmt="H", argtype=String)
+        self.add_argument("status", type=UInt8)
+        self.add_argument("priv", argtype=String) # TODO: string with terminator
     
 
 class Priv(BaseToken):
     """
     /*
     * privtstrlen		1 byte
-    * privtstr		N bytes + 1
+    * privtstr		    N bytes + 1
     * privstrlen		1 byte
-    * privstr		N bytes + 1
+    * privstr		    N bytes + 1
     */
     """
     token_id = AUT_PRIV
     identifier = "priv"
 
     def _setup(self):
-        self.add_argument("privset", "{len}s", len_fmt="H", type=String)
-        self.add_argument("privstr", "{len}s", lem_fmt="H", type=String)
+        self.add_argument("privset", type=String) # TODO length is not 16 bytes, it might requires __new__ function
+        self.add_argument("privstr", type=String) # TODO length is not 16 bytes

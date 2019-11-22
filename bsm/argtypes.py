@@ -257,28 +257,16 @@ class Process(ArgType):
         return self.name or str(self.value)
 
 class Uuid(ArgType):
+    """ TODO: UUID or UUID_BE
+    """
     struc_fmt = ""
 
 class Struct(ArgType):
-    def __init__(self, data):
-        self.add_argument("size", "I", argtype=int)
-        self.add_argument("version", "B", argtype=int)
-        self.add_argument("event_type", "H", argtype=EventType)
-        self.add_argument("modifier", "H", argtype=int)
-    
-    def fetch(self, record):
-        for name, fmt, argtype, kwargs in self.args:
-            if "len_fmt" in kwargs:
-                read = struct.calcsize(kwargs["len_fmt"])
-                length = unpack_one(kwargs["len_fmt"], record.read(read))
-                fmt = fmt.format(length=length)
-                logger.debug(
-                    f"len_fmt: {kwargs['len_fmt']}, len_fmt_size: {read}, length: {length}"
-                )
-            logger.debug(f"key: {name}, Format: {fmt}, argtype: {argtype}")
-            size = struct.calcsize(fmt)
-            r_value = unpack_one(fmt, record.read(size))
-            value = argtype(r_value)
-            logger.debug(f"r_value: {r_value}, type: {type(value)}, value: {value}")
-            #setattr(self, f"_{name}", r_value)
-            setattr(self, name, value)
+    """ TODO: Stuct is set of other Argtyps.
+    """
+    __fields__ = (
+        ("size", UInt32),
+        ("version", UInt32),
+        ("event_type", EventType),
+        ("modifier", UInt32),
+    )
