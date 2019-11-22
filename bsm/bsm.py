@@ -221,6 +221,7 @@ def au_read_rec(fp, partial :bool=False):
                 f"recsize: {recsize}({struct.calcsize('>I')}),"
                 f"_recsize: {_recsize}"
             )
+            #| head32 | head | head | trailer| 
             recsize = recsize - struct.calcsize(">BI")
             data = fp.read(recsize)
             yield Record(_bsm_type + _recsize + data)

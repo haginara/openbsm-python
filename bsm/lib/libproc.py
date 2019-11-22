@@ -3,52 +3,88 @@ from .headers import *
 
 #This header file contains private interfaces to obtain process information.  
 #These interfaces are subject to change in future releases.
+PROC_ALL_PIDS = 1
+PROC_PGRP_ONLY = 2
+PROC_TTY_ONLY = 3
+PROC_UID_ONLY = 4
+PROC_RUID_ONLY = 5
+PROC_PPID_ONLY = 6
 
 """
-	@define PROC_LISTPIDSPATH_PATH_IS_VOLUME
-	@discussion This flag indicates that all processes that hold open
-		file references on the volume associated with the specified
-		path should be returned.
+    @define PROC_LISTPIDSPATH_PATH_IS_VOLUME
+    @discussion This flag indicates that all processes that hold open
+        file references on the volume associated with the specified
+        path should be returned.
 """
 PROC_LISTPIDSPATH_PATH_IS_VOLUME	= 1
 
 
 """
-	@define PROC_LISTPIDSPATH_EXCLUDE_EVTONLY
-	@discussion This flag indicates that file references that were opened
-		with the O_EVTONLY flag should be excluded from the matching
-		criteria.
+    @define PROC_LISTPIDSPATH_EXCLUDE_EVTONLY
+    @discussion This flag indicates that file references that were opened
+        with the O_EVTONLY flag should be excluded from the matching
+        criteria.
 """
 PROC_LISTPIDSPATH_EXCLUDE_EVTONLY	 = 2
 
 
 """
-	@function proc_listpidspath
-	@discussion A function which will search through the current
-		processes looking for open file references which match
-		a specified path or volume.
-	@param type types of processes to be searched (see proc_listpids)
-	@param typeinfo adjunct information for type
-	@param path file or volume path
-	@param pathflags flags to control which files should be considered
-		during the process search.
-	@param buffer a C array of int-sized values to be filled with
-		process identifiers that hold an open file reference
-		matching the specified path or volume.  Pass NULL to
-		obtain the minimum buffer size needed to hold the
-		currently active processes.
-	@param buffersize the size (in bytes) of the provided buffer.
-	@result the number of bytes of data returned in the provided buffer;
-		-1 if an error was encountered;
+    @function proc_listpidspath
+    @discussion A function which will search through the current
+        processes looking for open file references which match
+        a specified path or volume.
+    @param type types of processes to be searched (see proc_listpids)
+    @param typeinfo adjunct information for type
+    @param path file or volume path
+    @param pathflags flags to control which files should be considered
+        during the process search.
+    @param buffer a C array of int-sized values to be filled with
+        process identifiers that hold an open file reference
+        matching the specified path or volume.  Pass NULL to
+        obtain the minimum buffer size needed to hold the
+        currently active processes.
+    @param buffersize the size (in bytes) of the provided buffer.
+    @result the number of bytes of data returned in the provided buffer;
+        -1 if an error was encountered;
 """
-#int	proc_listpidspath(uint32_t	type,
-#			  uint32_t	typeinfo,
-#			  const char	*path,
-#			  uint32_t	pathflags,
-#			  void		*buffer,
-#			  int		buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);
 
-#int proc_listpids(uint32_t type, uint32_t typeinfo, void *buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);
+def _get_libproc():
+    return ctypes.CDLL(ctypes.util.find_library("libproc"))
+
+def _get_libproc_func(name, argtypes, restype):
+    f = getattr(_get_libproc(), name)
+    f.argtypes = argtypes
+    f.restype = restype
+    return f
+
+def proc_listpidspath(pid_type: int, typeinfo: int, path: str, pathflags: int, buffer: str):
+    """
+    #int	proc_listpidspath(uint32_t	type,
+    #			  uint32_t	typeinfo,
+    #			  const char	*path,
+    #			  uint32_t	pathflags,
+    #			  void		*buffer,
+    #			  int		buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);
+    """
+    _proc_listpidspath = _get_libproc_func(
+        "proc_listpidspath", 
+        [uint32, void_p, uint32, void_p, uint32],
+        uint32
+    )
+    buf = ctypes.create_string_buffer(1024)
+
+
+def proc_listpids(proc_type):
+    #int proc_listpids(uint32_t type, uint32_t typeinfo, void *buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);
+    _proc_listpids = _get_libproc_func(
+        "proc_listpids", 
+        [uint32, uint32, void_p, uint32],
+        uint32
+    )
+    _proc_listpids
+
+
+
 #int proc_listallpids(void * buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_1);
 #int proc_listpgrppids(pid_t pgrpid, void * buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_1);
 #int proc_listchildpids(pid_t ppid, void * buffer, int buffersize) __OSX_AVAILABLE_STARTING(__MAC_10_7, __IPHONE_4_1);

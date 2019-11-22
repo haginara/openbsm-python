@@ -603,7 +603,7 @@ class InAddrEx(BaseToken):
     identifier = "ip addr ex"
     
     def _setup(self):
-        self.add_arguemnt("ad_type", "I", argtype=int)
+        self.add_argument("ad_type", "I", argtype=int)
         self.add_argument("address", "Q", argtype=int) # print_ip_ex_address
 
 class Ip(BaseToken):
@@ -635,7 +635,7 @@ class Ipc(BaseToken):
 
     def _setup(self):
         self.add_argument("ipc_type", "B", argtype=int)
-        self.add_arguemnt("ipc_id", "I", argtype=int)
+        self.add_argument("ipc_id", "I", argtype=int)
 
 class IpcPerm(BaseToken):
     """
@@ -776,9 +776,9 @@ class Socket(BaseToken):
     def _setup(self):
         self.add_argument("sock_type", "H", argtype=int)
         self.add_argument("l_port", "H", argtype=int)
-        self.add_arguemnt("l_addr", "I", argtype=IPv4Address)
+        self.add_argument("l_addr", "I", argtype=IPv4Address)
         self.add_argument("r_port", "H", argtype=int)
-        self.add_arguemnt("r_addr", "I", argtype=IPv4Address)
+        self.add_argument("r_addr", "I", argtype=IPv4Address)
     
 
 class SockInet32(BaseToken):
@@ -793,7 +793,7 @@ class SockInet32(BaseToken):
     def _setup(self):
         self.add_argument("family", "H", argtype=int)
         self.add_argument("port", "H", argtype=int)
-        self.add_arguemnt("address", "I", argtype=IPv4Address)
+        self.add_argument("address", "I", argtype=IPv4Address)
 
 #TODO: Complete Token classes
 
