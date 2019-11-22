@@ -51,42 +51,21 @@ class TokenFetcher(abc.ABCMeta):
         return cls
 
     @classmethod
-    def get_token(cls, token_id: int) -> Token:
+    def get_token(cls, token_id: int, record: Rec) -> Token:
         obj = cls.__tokens__.get(token_id, None)
         if obj is None:
             raise NotImplementedError(f"{token_id}(0x{token_id:x})")
-        return obj()
-
-    @classmethod
-    def fetch_token(cls, token_id: int, record: Rec) -> Optional[Token]:
-        token = TokenFetcher.get_token(token_id)
-        if token is None:
-            return None
-        for name, fmt, argtype, kwargs in token.args:
-            if "len_fmt" in kwargs:
-                read = struct.calcsize(kwargs["len_fmt"])
-                length = unpack_one(kwargs["len_fmt"], record.get_data(read))
-                fmt = fmt.format(length=length)
-                logger.debug(
-                    f"len_fmt: {kwargs['len_fmt']}, len_fmt_size: {read}, length: {length}"
-                )
-            logger.debug(f"key: {name}, Format: {fmt}, argtype: {argtype}")
-            size = struct.calcsize(fmt)
-            r_value = unpack_one(fmt, record.get_data(size))
-            value = argtype(r_value)
-            logger.debug(f"r_value: {r_value}, type: {type(value)}")
-            logger.debug(f"value: {value}")
-            setattr(token, f"_{name}", r_value)
-            setattr(token, name, value)
+        token = obj()
+        token.fetch(record)
         return token
 
 
 class BaseToken(metaclass=TokenFetcher):
     __delm__ = ","
-    __order__ = ">"
 
     def __init__(self):
         self.args = []
+
         self._setup()
 
     def __repr__(self):
@@ -97,14 +76,10 @@ class BaseToken(metaclass=TokenFetcher):
     def _setup(self):
         raise NotImplemented
 
-    def add_argument(self, name, argfmt, argtype, **kwargs):
+    def add_argument(self, name, argtype, **kwargs):
         """
-        kwargs:
-         - size
         """
-        if "len_fmt" in kwargs:
-            kwargs["len_fmt"] = f"{self.__order__}{kwargs['len_fmt']}"
-        self.args.append((name, f"{self.__order__}{argfmt}", argtype, kwargs))
+        self.args.append((name, argtype, kwargs))
 
     def get_length(self):
         return sum([struct.calcsize(self.args[key][0]) for key in self.args])
@@ -114,22 +89,16 @@ class BaseToken(metaclass=TokenFetcher):
             [f"{getattr(self, arg[0])}" for arg in self.args]
         )
 
-    def fetch(self, token_id: int, record: Rec) -> None:
-        for name, fmt, argtype, kwargs in self.args:
-            if "len_fmt" in kwargs:
-                read = struct.calcsize(kwargs["len_fmt"])
-                length = unpack_one(kwargs["len_fmt"], record.get_data(read))
-                fmt = fmt.format(length=length)
-                logger.debug(
-                    f"len_fmt: {kwargs['len_fmt']}, len_fmt_size: {read}, length: {length}"
-                )
-            logger.debug(f"key: {name}, Format: {fmt}, argtype: {argtype}")
-            size = struct.calcsize(fmt)
-            r_value = unpack_one(fmt, record.get_data(size))
-            value = argtype(r_value)
-            logger.debug(f"r_value: {r_value}, type: {type(value)}")
-            logger.debug(f"value: {value}")
-            setattr(self, f"_{name}", r_value)
+    def fetch(self, record: Rec) -> None:
+        for name, argtype, kwargs in self.args:
+            logger.debug(f"key: {name}, argtype: {argtype}")
+            try:
+                value = argtype(record)
+            except NotImplementedError as e:
+                logger.error(f"{e}: {name}, {argtype}")
+                raise(e)
+            logger.debug(f"r_value: {value._raw}, type: {type(value)}, value: {value}")
+            #setattr(self, f"_{name}", r_value)
             setattr(self, name, value)
 
     def print_tok_type(self, tok_type, tokname, oflags):
@@ -158,7 +127,7 @@ class BaseToken(metaclass=TokenFetcher):
                 f"{self.__delm__}".join(
                     [
                         f"{getattr(self, name)}"
-                        for name, _, _, kw in self.args
+                        for name, _, kw in self.args
                         if kw.get("show", True)
                     ]
                 )
@@ -168,7 +137,7 @@ class BaseToken(metaclass=TokenFetcher):
                 f"{self.__delm__}".join(
                     [
                         f"{getattr(self, name)}"
-                        for name, _, _, kw in self.args
+                        for name, _, kw in self.args
                         if kw.get("show", True)
                     ]
                 )
@@ -179,10 +148,10 @@ class Header(BaseToken):
     identifier = "header"
 
     def _setup(self):
-        self.add_argument("size", "I", argtype=int)
-        self.add_argument("version", "B", argtype=int)
-        self.add_argument("event_type", "H", argtype=EventType)
-        self.add_argument("modifier", "H", argtype=int)
+        self.add_argument("size", argtype=UInt32)
+        self.add_argument("version", argtype=UInt8)
+        self.add_argument("event_type", argtype=EventType)
+        self.add_argument("modifier", argtype=UInt16)
 
 
 class Header32(Header):
@@ -202,9 +171,8 @@ class Header32(Header):
 
     def _setup(self):
         super()._setup()
-        self.add_argument("time", "I", argtype=DateTime)
-        self.add_argument("msec", "I", argtype=MSec)
-
+        self.add_argument("time", argtype=DateTime)
+        self.add_argument("msec", argtype=MSec)
 
 class Header32_Ex(Header):
     """
@@ -230,10 +198,10 @@ class Header32_Ex(Header):
 
     def _setup(self):
         super()._setup()
-        self.add_argument("ad_type", "I", argtype=int)
-        self.add_argument("address", "I", argtype=IPv4Address)
-        self.add_argument("time", "I", argtype=DateTime)
-        self.add_argument("msec", "I", argtype=MSec)
+        self.add_argument("address", argtype=IPAddress)
+        #self.add_argument("address", "I", argtype=IPv4Address)#Conditional()
+        self.add_argument("time", argtype=DateTime)
+        self.add_argument("msec", argtype=MSec)
 
 
 class Trailer(BaseToken):
@@ -246,8 +214,8 @@ class Trailer(BaseToken):
     identifier = "trailer"
 
     def _setup(self):
-        self.add_argument("magic", "H", argtype=int, show=False)
-        self.add_argument("count", "I", argtype=int)
+        self.add_argument("magic", argtype=UInt16, show=False)
+        self.add_argument("count", argtype=UInt32)
 
 
 class Argument(BaseToken):
@@ -262,9 +230,9 @@ class Argument(BaseToken):
     identifier = "argument"
 
     def _setup(self):
-        self.add_argument("no", "b", argtype=int)
-        self.add_argument("val", "I", argtype=hex)
-        self.add_argument("text", "{length}s", len_fmt="H", argtype=String)
+        self.add_argument("no", argtype=UInt8)
+        self.add_argument("val", argtype=UInt32)# Hex
+        self.add_argument("text", argtype=String)
 
 
 class Arg32(Argument):
@@ -282,9 +250,9 @@ class Arg64(Argument):
     token_id = AUT_ARG64
 
     def _setup(self):
-        self.add_argument("no", "b", argtype=int)
-        self.add_argument("val", "Q", argtype=hex)
-        self.add_argument("text", "{length}s", len_fmt="H", argtype=String)
+        self.add_argument("no", argtype=UInt8)
+        self.add_argument("val", argtype=UInt64) #hex
+        self.add_argument("text", argtype=String)
 
 
 class Text(BaseToken):
@@ -292,7 +260,7 @@ class Text(BaseToken):
     identifier = "text"
 
     def _setup(self):
-        self.add_argument("data", "{length}s", len_fmt="H", argtype=String)
+        self.add_argument("data", argtype=String)
 
 
 class Path(Text):
@@ -304,7 +272,7 @@ class Return(BaseToken):
     identifier = "return"
 
     def _setup(self):
-        self.add_argument("errno", "B", argtype=ReturnString)
+        self.add_argument("errno", argtype=ReturnString)
        
 
 class Return32(Return):
@@ -316,14 +284,14 @@ class Return32(Return):
     
     def _setup(self):
         super()._setup()
-        self.add_argument("value", "I", argtype=int)
+        self.add_argument("value", argtype=UInt32)
 
 class Return64(Return):
     token_id = AUT_RETURN64
 
     def _setup(self):
         super()._setup()
-        self.add_argument("value", "Q", argtype=int)
+        self.add_argument("value", argtype=UInt64)
 
 class ReturnUuid(Return):
     token_id = AUT_RETURN_UUID
@@ -331,7 +299,11 @@ class ReturnUuid(Return):
     def _setup(self):
         super()._setup()
         self.add_argument("uuid_be", "sizeof_uuid", argtype='uuid')
-        self.add_argument("uuid", "{length}s", len_fmt="H", argtype=String)
+        self.add_argument("uuid", argtype=String)
+
+class Uuid(BaseToken):
+    toekn_id = AUT_ARG_UUID
+    identifier = "uuid"
 
 class Identity(BaseToken):
     """
@@ -350,12 +322,12 @@ class Identity(BaseToken):
     identifier = "identity"
 
     def _setup(self):
-        self.add_argument("signer_type", "I", argtype=int)
-        self.add_argument("signing_id", "{length}s", len_fmt="H", argtype=String)
-        self.add_argument("signing_id_truncated", "B", argtype=CompleteString)
-        self.add_argument("team_id", "{length}s", len_fmt="H", argtype=String)
-        self.add_argument("team_id_truncated", "B", argtype=CompleteString)
-        self.add_argument("cbhash", "{length}s", len_fmt="H", argtype=ByteString)
+        self.add_argument("signer_type",            argtype=UInt32)
+        self.add_argument("signing_id",             argtype=String)
+        self.add_argument("signing_id_truncated",   argtype=CompleteString)
+        self.add_argument("team_id",                argtype=String)
+        self.add_argument("team_id_truncated",      argtype=CompleteString)
+        self.add_argument("cbhash",                 argtype=ByteString)
 
 
 class Subject(BaseToken):
@@ -363,13 +335,13 @@ class Subject(BaseToken):
     identifier = "subject"
 
     def _setup(self):
-        self.add_argument("auid", "I", argtype=User)
-        self.add_argument("euid", "I", argtype=User)
-        self.add_argument("egid", "I", argtype=Group)
-        self.add_argument("ruid", "I", argtype=User)
-        self.add_argument("rgid", "I", argtype=Group)
-        self.add_argument("pid", "I", argtype=Process)
-        self.add_argument("sid", "I", argtype=int)
+        self.add_argument("auid", argtype=User)
+        self.add_argument("euid", argtype=User)
+        self.add_argument("egid", argtype=Group)
+        self.add_argument("ruid", argtype=User)
+        self.add_argument("rgid", argtype=Group)
+        self.add_argument("pid", argtype=Process)
+        self.add_argument("sid", argtype=UInt32)
 
 
 class Subject32(Subject):
@@ -390,8 +362,8 @@ class Subject32(Subject):
 
     def _setup(self):
         super()._setup()
-        self.add_argument("tid_port", "I", argtype=int)
-        self.add_argument("tid_address", "I", argtype=IPv4Address)
+        self.add_argument("tid_port", argtype=UInt32)
+        self.add_argument("tid_address", argtype=IPv4Address)
 
 
 class Subject32_Ex(Subject):
@@ -414,10 +386,9 @@ class Subject32_Ex(Subject):
 
     def _setup(self):
         super()._setup()
-        self.add_argument("tid_port", "I", argtype=int)
-        self.add_argument("tid_type", "I", argtype=int, show=False)
-        # Not Support ipv6 yet
-        self.add_argument("tid_addr", "I", argtype=IPv4Address)
+        self.add_argument("tid_port", argtype=UInt32)
+        self.add_argument("tid_type", argtype=UInt32, show=False)
+        self.add_argument("tid_address", argtype=IPAddress)
 
 #TODO: Complete Subject64
 class Subject64(Subject):
@@ -440,12 +411,12 @@ class Attr(BaseToken):
     identifier = "attribute"
 
     def _setup(self):
-        self.add_argument('mode', "I", argtype=int)
-        self.add_argument('uid', "I", argtype=int)
-        self.add_argument('gid', "I", argtype=int)
-        self.add_argument('fsid', "I", argtype=int)
-        self.add_argument('nodeid', "Q", argtype=int)
-        self.add_argument('device', "I", argtype=int)
+        self.add_argument('mode', argtype=UInt32)
+        self.add_argument('uid', argtype=User)
+        self.add_argument('gid', argtype=Group)
+        self.add_argument('fsid', argtype=UInt32)
+        self.add_argument('nodeid', argtype=UInt64)
+        self.add_argument('device', argtype=UInt32)
 
 class Attr32(Attr):
     token_id = AUT_ATTR32
@@ -459,11 +430,8 @@ class Opaque(BaseToken):
     identifier = "opaque"
 
     def _setup(self):
-        self.add_argument("data", "{length}s", len_fmt="H", argtype=ByteString)
+        self.add_argument("data", argtype=ByteString)
 
-class Uuid(BaseToken):
-    toekn_id = AUT_ARG_UUID
-    identifier = "uuid"
 
 class Exit(BaseToken):
     """
@@ -474,8 +442,8 @@ class Exit(BaseToken):
     identifier = "exit"
 
     def _setup(self):
-        self.add_argument('errval', 'I', argtype=int)
-        self.add_argument('retval', 'I', argtype=int)
+        self.add_argument('errval', argtype=UInt32)
+        self.add_argument('retval', argtype=UInt32)
 
 class ExecArgs(BaseToken):
     """
@@ -564,14 +532,11 @@ class OtherFile(BaseToken):
     identifier = "file"
 
     def _setup(self):
-        self.add_argument("time", "I", argtype=int)
-        self.add_argument("msec", "I", argtype=MSec)
-        self.add_argument("pathname", "{length}s", len_fmt="H", argtype=String)
+        self.add_argument("time", argtype=UInt32)
+        self.add_argument("msec", argtype=MSec)
+        self.add_argument("pathname", argtype=String)
 
 
-class Groups(ArgType):
-    def __init__(self, groups):
-        self._groups = groups
 
 class NewGroups(BaseToken):
     """
@@ -592,7 +557,7 @@ class InAddr(BaseToken):
     identifier = "ip addr"
 
     def _setup(self):
-        self.add_argument("addr", "I", argtype=IPv4Address)
+        self.add_argument("addr", argtype=IPv4Address)
 
 class InAddrEx(BaseToken):
     """
@@ -603,8 +568,8 @@ class InAddrEx(BaseToken):
     identifier = "ip addr ex"
     
     def _setup(self):
-        self.add_argument("ad_type", "I", argtype=int)
-        self.add_argument("address", "Q", argtype=int) # print_ip_ex_address
+        self.add_argument("ad_type", argtype=UInt32)
+        self.add_argument("address", argtype=IPv6Address) # print_ip_ex_address
 
 class Ip(BaseToken):
     """
@@ -614,16 +579,16 @@ class Ip(BaseToken):
     identifier = "ip"
 
     def _setup(self):
-        self.add_argument("version", "B", argtype=int)
-        self.add_argument("tos", "B", argtype=int)
-        self.add_argument("len", "H", argtype=int)
-        self.add_argument("id", "H", argtype=int)
-        self.add_argument("offset", "H", argtype=int)
-        self.add_argument("ttl", "B", argtype=int)
-        self.add_argument("prot", "B", argtype=int)
-        self.add_argument("chksm", "H", argtype=int)
-        self.add_argument("src", "I", argtype=int)
-        self.add_argument("dest", "I", argtype=int)
+        self.add_argument("version", "B", argtype=UInt32)
+        self.add_argument("tos", "B", argtype=UInt32)
+        self.add_argument("len", "H", argtype=UInt32)
+        self.add_argument("id", "H", argtype=UInt32)
+        self.add_argument("offset", "H", argtype=UInt32)
+        self.add_argument("ttl", "B", argtype=UInt32)
+        self.add_argument("prot", "B", argtype=UInt32)
+        self.add_argument("chksm", "H", argtype=UInt32)
+        self.add_argument("src", "I", argtype=UInt32)
+        self.add_argument("dest", "I", argtype=UInt32)
 
 class Ipc(BaseToken):
     """
@@ -634,8 +599,8 @@ class Ipc(BaseToken):
     identifier = "ipc"
 
     def _setup(self):
-        self.add_argument("ipc_type", "B", argtype=int)
-        self.add_argument("ipc_id", "I", argtype=int)
+        self.add_argument("ipc_type", "B", argtype=UInt32)
+        self.add_argument("ipc_id", "I", argtype=UInt32)
 
 class IpcPerm(BaseToken):
     """
@@ -651,13 +616,13 @@ class IpcPerm(BaseToken):
     identifier = "IPC perm"
 
     def _setup(self):
-        self.add_argument("uid", "I", argtype=int)
-        self.add_argument("gid", "I", argtype=int)
-        self.add_argument("puid", "I", argtype=int)
-        self.add_argument("pgid", "I", argtype=int)
-        self.add_argument("mode", "I", argtype=int)
-        self.add_argument("seq", "I", argtype=int)
-        self.add_argument("key", "I", argtype=int)
+        self.add_argument("uid", "I", argtype=UInt32)
+        self.add_argument("gid", "I", argtype=UInt32)
+        self.add_argument("puid", "I", argtype=UInt32)
+        self.add_argument("pgid", "I", argtype=UInt32)
+        self.add_argument("mode", "I", argtype=UInt32)
+        self.add_argument("seq", "I", argtype=UInt32)
+        self.add_argument("key", "I", argtype=UInt32)
 
 
 class Iport(BaseToken):
@@ -668,7 +633,7 @@ class Iport(BaseToken):
     identifier = "ip port"
 
     def _setup(self):
-        self.add_argument("port", "H", argtype=int)
+        self.add_argument("port", "H", argtype=UInt32)
 
 
 class Process32(Subject32):
@@ -726,7 +691,7 @@ class Process64(Subject):
 
     def _setup(self):
         super()._setup()
-        self.add_argument("tid_port", "Q", argtype=int)
+        self.add_argument("tid_port", "Q", argtype=UInt32)
         self.add_argument("tid_address", "I", argtype=IPv4Address)
 
 class Process64Ex(Subject):
@@ -749,9 +714,9 @@ class Process64Ex(Subject):
 
     def _setup(self):
         super()._setup()
-        self.add_argument("tid_port", "Q", argtype=int)
-        self.add_argument("tid_addr_type", "I", argtype=int)
-        self.add_argument("tid_address", "2Q", argtype=int)
+        self.add_argument("tid_port", "Q", argtype=UInt32)
+        self.add_argument("tid_addr_type", "I", argtype=UInt32)
+        self.add_argument("tid_address", "2Q", argtype=UInt32)
 
 
 class Seq(BaseToken):
@@ -759,7 +724,7 @@ class Seq(BaseToken):
     identifier = "sequence"
 
     def _setup(self):
-        self.add_argument("seqno", "I", argtype=int)
+        self.add_argument("seqno", "I", argtype=UInt32)
 
 
 class Socket(BaseToken):
@@ -774,10 +739,10 @@ class Socket(BaseToken):
     identifier = "socket"
 
     def _setup(self):
-        self.add_argument("sock_type", "H", argtype=int)
-        self.add_argument("l_port", "H", argtype=int)
+        self.add_argument("sock_type", "H", argtype=UInt32)
+        self.add_argument("l_port", "H", argtype=UInt32)
         self.add_argument("l_addr", "I", argtype=IPv4Address)
-        self.add_argument("r_port", "H", argtype=int)
+        self.add_argument("r_port", "H", argtype=UInt32)
         self.add_argument("r_addr", "I", argtype=IPv4Address)
     
 
@@ -791,8 +756,8 @@ class SockInet32(BaseToken):
     identifier = "socket-inet"
 
     def _setup(self):
-        self.add_argument("family", "H", argtype=int)
-        self.add_argument("port", "H", argtype=int)
+        self.add_argument("family", "H", argtype=UInt32)
+        self.add_argument("port", "H", argtype=UInt32)
         self.add_argument("address", "I", argtype=IPv4Address)
 
 #TODO: Complete Token classes
@@ -806,7 +771,7 @@ class SockUnix(BaseToken):
     identifier = "socket-unix"
 
     def _setup(self):
-        self.add_argument("addr_type", "H", argtype=int)
+        self.add_argument("addr_type", "H", argtype=UInt32)
         self.add_argument("path", "s", argtype=String)
 
 class SockInet128(BaseToken):
@@ -819,9 +784,9 @@ class SockInet128(BaseToken):
     identifier = "socket-inet6"
 
     def _setup(self):
-        self.add_argument("sock_type", "H", argtype=int)
-        self.add_argument("port", "H", argtype=int)
-        self.add_argument("addr", "Q", argtype=int)
+        self.add_argument("sock_type", "H", argtype=UInt32)
+        self.add_argument("port", "H", argtype=UInt32)
+        self.add_argument("addr", "Q", argtype=UInt32)
 
 class SocketEx(BaseToken):
     """
@@ -837,12 +802,12 @@ class SocketEx(BaseToken):
     identifier = "socket"
 
     def _setup(self):
-        self.add_argument("domain", "H", argtype=int)
-        self.add_argument("sock_type", "H", argtype=int)
-        self.add_argument("addr_type", "H", argtype=int)
-        self.add_argument("l_port", "H", argtype=int)
+        self.add_argument("domain", "H", argtype=UInt32)
+        self.add_argument("sock_type", "H", argtype=UInt32)
+        self.add_argument("addr_type", "H", argtype=UInt32)
+        self.add_argument("l_port", "H", argtype=UInt32)
         self.add_argument("l_addr", "I", argtype=IPv4Address)
-        self.add_argument("r_port", "H", argtype=int)
+        self.add_argument("r_port", "H", argtype=UInt32)
         self.add_argument("r_addr", "I", argtype=IPv4Address)
     
 
@@ -857,9 +822,9 @@ class Arb(BaseToken):
     identifier = "arbitrary"
 
     def _setup(self):
-        self.add_argument("howtopr", "H", argtype=int)
-        self.add_argument("bu", "H", argtype=int)
-        self.add_argument("uc", "H", argtype=int)
+        self.add_argument("howtopr", "H", argtype=UInt32)
+        self.add_argument("bu", "H", argtype=UInt32)
+        self.add_argument("uc", "H", argtype=UInt32)
         self.add_argument("data", "{}s", argtype=String)
 
 

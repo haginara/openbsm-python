@@ -36,29 +36,13 @@ def unpack_one(fmt, data):
 
 
 def fetch_token(token_id: int, record: Rec) -> Optional[BaseToken]:
-    token = TokenFetcher.get_token(token_id)
+    token = TokenFetcher.get_token(token_id, record)
     if token is None:
         return None
-    for name, fmt, argtype, kwargs in token.args:
-        if "len_fmt" in kwargs:
-            read = struct.calcsize(kwargs["len_fmt"])
-            length = unpack_one(kwargs["len_fmt"], record.get_data(read))
-            fmt = fmt.format(length=length)
-            logger.debug(
-                f"len_fmt: {kwargs['len_fmt']}, len_fmt_size: {read}, length: {length}"
-            )
-        logger.debug(f"key: {name}, Format: {fmt}, argtype: {argtype}")
-        size = struct.calcsize(fmt)
-        r_value = unpack_one(fmt, record.get_data(size))
-        value = argtype(r_value)
-        logger.debug(f"r_value: {r_value}, type: {type(value)}")
-        logger.debug(f"value: {value}")
-        setattr(token, f"_{name}", r_value)
-        setattr(token, name, value)
     return token
 
 
-class Record:
+class Record(object):
     DUMP_COM        = 0x0000
     DUMP_RAW        = 0x0001
     DUMP_SHORT      = 0x0002
@@ -67,7 +51,7 @@ class Record:
     DUMP_JSON       = 0x0010
 
 
-    def __init__(self, data):
+    def __init__(self, data) -> bytes:
         self.data = data
         self.length = len(data)
         self.bytesread = 0
@@ -77,7 +61,7 @@ class Record:
     def remains(self):
         return self.length - self.bytesread
 
-    def get_data(self, size):
+    def read(self, size) -> bytes:
         start = self.bytesread
         end = start + size
         if end > self.length:
@@ -87,7 +71,7 @@ class Record:
         return self.data[start:end]
 
     def next_token_id(self) -> int:
-        token_id = struct.unpack(">B", self.get_data(1))[0]
+        token_id = struct.unpack(">B", self.read(1))[0]
         return token_id
 
     def fetch_tokens(self):
@@ -113,65 +97,6 @@ class Record:
 
     def asdict(self):
         """
-        XML
-        <record version="11" event="audit crash recovery" modifier="0" time="Tue Nov  5 22:14:41 2019" msec=" + 945 msec" >
-            <text>launchd::Audit recovery</text>
-            <path>/var/audit/20191104194608.crash_recovery</path>
-            <return errval="success" retval="0" />
-            <identity signer-type="1" signing-id="com.apple.xpc.launchd" signing-id-truncated="no" team-id="" team-id-truncated="no" cdhash="0x2623e0657eb3c1c063dec9aeef40a0ce175d1ec9" />
-        </record>
-        JSON
-        {
-            "record": {
-                "text": "launchd::Audit recovery",
-                "path": "/var/audit/20191104194608.crash_recovery",
-                "return": {
-                    "_errval": "success",
-                    "_retval": "0"
-                },
-                "identity": {
-                    "_signer-type": "1",
-                    "_signing-id": "com.apple.xpc.launchd",
-                    "_signing-id-truncated": "no",
-                    "_team-id": "",
-                    "_team-id-truncated": "no",
-                    "_cdhash": "0x2623e0657eb3c1c063dec9aeef40a0ce175d1ec9"
-                },
-                "_version": "11",
-                "_event": "audit crash recovery",
-                "_modifier": "0",
-                "_time": "Tue Nov  5 22:14:41 2019",
-                "_msec": " + 945 msec"
-            }
-        }
-        {
-            "record": {
-                "size": "158",
-                "version": "11",
-                "event_type": "audit crash recovery",
-                "modifier": "0",
-                "time": "Tue Nov  5 22:14:41 2019",
-                "msec": " + 945 msec",
-                "text": {
-                    "data": "launchd::Audit recovery"
-                },
-                "path": {
-                    "data": "/var/audit/20191104194608.crash_recovery"
-                },
-                "return": {
-                    "errno": "success",
-                    "value": "0"
-                },
-                "identity": {
-                    "signer_type": "1",
-                    "signing_id": "com.apple.xpc.launchd",
-                    "signing_id_truncated": "complete",
-                    "team_id": "",
-                    "team_id_truncated": "complete",
-                    "cbhash": "0x2623e0657eb3c1c063dec9aeef40a0ce175d1ec9"
-                }
-            }
-        }
         """
         # token[0] is Header
         # token[-1] is Trailer
