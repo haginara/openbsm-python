@@ -15,7 +15,7 @@ install_requires = [
 
 setup(
     name="openbsm",
-    description="ssh client config manager",
+    description="MacOS OpenBSM library",
     license="MIT License",
     url="https://github.com/haginara/openbsm-python",
     long_description=long_description,
