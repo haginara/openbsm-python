@@ -8,7 +8,7 @@ Install
 =======
 clone this project and use pip3
 
-```pip3 install . ```
+```pip3 install openbsm```
 
 Features
 ========
