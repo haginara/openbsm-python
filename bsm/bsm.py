@@ -29,27 +29,13 @@ class UnknownHeader(Exception):
     pass
 
 
-def unpack_one(fmt, data):
-    one = struct.unpack(fmt, data)[0]
-    logger.debug(f"data: {data}, unpacked: {one}")
-    return one
-
-
-def fetch_token(token_id: int, record: Rec) -> Optional[BaseToken]:
-    token = TokenFetcher.get_token(token_id, record)
-    if token is None:
-        return None
-    return token
-
-
 class Record(object):
-    DUMP_COM        = 0x0000
-    DUMP_RAW        = 0x0001
-    DUMP_SHORT      = 0x0002
-    DUMP_XML        = 0x0004
-    DUMP_NORESOLVE  = 0x0008
-    DUMP_JSON       = 0x0010
-
+    DUMP_COM = 0x0000
+    DUMP_RAW = 0x0001
+    DUMP_SHORT = 0x0002
+    DUMP_XML = 0x0004
+    DUMP_NORESOLVE = 0x0008
+    DUMP_JSON = 0x0010
 
     def __init__(self, data) -> bytes:
         self.data = data
@@ -81,11 +67,11 @@ class Record(object):
             if token_id == 0:
                 break
             logger.debug(f"token_id: {token_id}-0x{token_id:x}")
-            token = fetch_token(token_id, self)
-            if token:
-                logger.debug(f"TOKEN: {token_id:x}: {token}")
+            try:
+                token = BSMStruct.get_token(token_id, self)
+                logger.debug(f"TOKEN: 0x{token_id:x}: {token}")
                 self.tokens.append(token)
-            else:
+            except NotImplementedError:
                 raise NotImplementedToken(
                     f"NotImplementedToken: 0x{token_id:x}, reamins: {self.remains()}"
                 )
@@ -119,7 +105,7 @@ def au_fetch_invalid_tok(record: Record):
     return 0
 
 
-def au_read_rec(fp, partial :bool=False):
+def au_read_rec(fp, partial: bool = False):
     """ Read Record from audit file
 
         BSM_TYPE: sizeof(byte)
@@ -129,7 +115,7 @@ def au_read_rec(fp, partial :bool=False):
     # TODO: Partial read
     while True:
         if partial:
-            _bsm_type = b'\x14'
+            _bsm_type = b"\x14"
             partial = False
         else:
             _bsm_type = fp.read(1)
@@ -146,7 +132,7 @@ def au_read_rec(fp, partial :bool=False):
                 f"recsize: {recsize}({struct.calcsize('>I')}),"
                 f"_recsize: {_recsize}"
             )
-            #| head32 | head | head | trailer| 
+            # | head32 | head | head | trailer|
             recsize = recsize - struct.calcsize(">BI")
             data = fp.read(recsize)
             yield Record(_bsm_type + _recsize + data)

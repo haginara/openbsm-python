@@ -67,12 +67,12 @@ AUT_SOCKET_EX = 0x7F
 #
 # Pre-64-bit BSM, 32-bit tokens weren't explicitly named as '32'.  We have
 # compatibility defines.
-AUT_HEADER = AUT_HEADER32
-AUT_ARG = AUT_ARG32
-AUT_RETURN = AUT_RETURN32
-AUT_SUBJECT = AUT_SUBJECT32
-AUT_PROCESS = AUT_PROCESS32
-AUT_OTHER_FILE = AUT_OTHER_FILE32
+AUT_HEADER      = AUT_HEADER32
+AUT_ARG         = AUT_ARG32
+AUT_RETURN      = AUT_RETURN32
+AUT_SUBJECT     = AUT_SUBJECT32
+AUT_PROCESS     = AUT_PROCESS32
+AUT_OTHER_FILE  = AUT_OTHER_FILE32
 #
 # *
 # The values for the following token ids are not defined by BSM.
@@ -83,9 +83,9 @@ AUT_OTHER_FILE = AUT_OTHER_FILE32
 AUT_SOCKINET32 = 0x80  # XXX
 AUT_SOCKINET128 = 0x81  # XXX
 AUT_SOCKUNIX = 0x82  # XXX
-_AUT_RIGHTS =		0x83		# XXX FreeBSD
-AUT_ARG_UUID =		0x84		# UUID of argument object
-AUT_RETURN_UUID =		0x85	# UUID of returned object
+_AUT_RIGHTS = 0x83  # XXX FreeBSD
+AUT_ARG_UUID = 0x84  # UUID of argument object
+AUT_RETURN_UUID = 0x85  # UUID of returned object
 
 #
 
@@ -116,6 +116,13 @@ AUR_SHORT_SIZE = 2  # sizeof(uint16_t)
 AUR_INT32_SIZE = 4  # sizeof(uint32_t)
 AUR_INT_SIZE = AUR_INT32_SIZE
 AUR_INT64_SIZE = 8  # sizeof(uint64_t)
+
+AUR_BYTE_FORMAT = "B"
+AUR_CHAR_FORMAT = "c"
+AUR_SHORT_FORMAT = "H"
+AUR_INT32_FORMAT = "I"
+AUR_INT_FORMAT = AUR_INT32_FORMAT
+AUR_INT64_FORMAT = "Q"
 #
 # Modifiers for the header token
 PAD_NOTATTR = 0x4000  # nonattributable event

@@ -50,6 +50,10 @@ def get_options(argv):
         "-p", dest='partial', action="store_true",
         help="Specify this option if input o praudit is piped from tail(1) utility. This cause praudit to sync to the start of the next record.",
     )
+    parser.add_argument(
+        "-f", dest='filter',
+        help=""
+    )
 
     options, args = parser.parse_known_args(argv)
     if len(args) > 0 and os.path.exists(args[0]):

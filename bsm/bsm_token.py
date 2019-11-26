@@ -33,128 +33,15 @@ class UnknownHeader(Exception):
     pass
 
 
-def unpack_one(fmt, data):
-    one = struct.unpack(fmt, data)[0]
-    logger.debug(f"data: {data}, unpacked: {one}")
-    return one
+class Header(BSMStruct):
+    __fields__ = [
+        ("size", UInt32("size")),
+        ("version", UInt8("version")),
+        ("event_type", EventType("event_type")),
+        ("modifier", UInt16("modifier")),
+    ]
 
-
-class TokenFetcher(abc.ABCMeta):
-    __tokens__ = {}
-
-    def __new__(metaclass, name, base, namespace):
-        cls = abc.ABCMeta.__new__(metaclass, name, base, namespace)
-        if getattr(cls, "token_id", None):
-            cls.token_name = f"AUT_{name.upper()}"
-            logger.debug(cls.token_id, cls.token_name)
-            metaclass.__tokens__[cls.token_id] = cls
-        return cls
-
-    @classmethod
-    def get_token(cls, token_id: int, record: Rec) -> Token:
-        obj = cls.__tokens__.get(token_id, None)
-        if obj is None:
-            raise NotImplementedError(f"{token_id}(0x{token_id:x})")
-        token = obj()
-        token.fetch(record)
-        return token
-
-
-class BaseToken(metaclass=TokenFetcher):
-    __delm__ = ","
-
-    def __init__(self):
-        self.args = []
-
-        self._setup()
-
-    def __repr__(self):
-        return f"{self.token_name}"
-
-    # @abc.abstractproperty
-    @abc.abstractmethod
-    def _setup(self):
-        raise NotImplemented
-
-    def add_argument(self, name, argtype, **kwargs):
-        """
-        """
-        self.args.append((name, argtype, kwargs))
-
-    def get_length(self):
-        return sum([struct.calcsize(self.args[key][0]) for key in self.args])
-
-    def __str__(self):
-        return f"{self.token_id}{self.__delm__}".join(
-            [f"{getattr(self, arg[0])}" for arg in self.args]
-        )
-
-    def fetch(self, record: Rec) -> None:
-        for name, argtype, kwargs in self.args:
-            logger.debug(f"key: {name}, argtype: {argtype}")
-            try:
-                value = argtype(record)
-            except NotImplementedError as e:
-                logger.error(f"{e}: {name}, {argtype}")
-                raise(e)
-            logger.debug(f"r_value: {value._raw}, type: {type(value)}, value: {value}")
-            #setattr(self, f"_{name}", r_value)
-            setattr(self, name, value)
-
-    def print_tok_type(self, tok_type, tokname, oflags):
-        if oflags & AU_OFLAG_RAW:
-            print(f"{tok_type}", end=self.__delm__)
-        else:
-            print(f"{tokname}", end=self.__delm__)
-  
-    def print(self, oflags: int):
-        if oflags & AU_OFLAG_RAW:
-            print(f"{self.token_id}", end=self.__delm__)
-        else:
-            print(f"{self.identifier}", end=self.__delm__)
-        self._print(oflags)
-    
-    def asdict(self):
-        return { name: f"{getattr(self, name)}" for name, _, _, kw in self.args if kw.get("show", True) }
-
-    def _print(self, oflags: int):
-        if oflags & AU_OFLAG_XML:
-            for name, _, _, kw in self.args:
-                if kw.get("show", True):
-                    print(f"{name}={getattr(self, name)}")
-        elif oflags & AU_OFLAG_RAW:
-            print(
-                f"{self.__delm__}".join(
-                    [
-                        f"{getattr(self, name)}"
-                        for name, _, kw in self.args
-                        if kw.get("show", True)
-                    ]
-                )
-            )
-        else:
-            print(
-                f"{self.__delm__}".join(
-                    [
-                        f"{getattr(self, name)}"
-                        for name, _, kw in self.args
-                        if kw.get("show", True)
-                    ]
-                )
-            )
-
-
-class Header(BaseToken):
-    identifier = "header"
-
-    def _setup(self):
-        self.add_argument("size", argtype=UInt32)
-        self.add_argument("version", argtype=UInt8)
-        self.add_argument("event_type", argtype=EventType)
-        self.add_argument("modifier", argtype=UInt16)
-
-
-class Header32(Header):
+class Header32(BSMStruct):
     """
         record byte count       4 bytes
         version #               1 byte    [2]
@@ -166,15 +53,16 @@ class Header32(Header):
         record = Record()
         record.generate(AUT_HEADER32)
     """
-
     token_id = AUT_HEADER32
+    identifier = "header"
 
-    def _setup(self):
-        super()._setup()
-        self.add_argument("time", argtype=DateTime)
-        self.add_argument("msec", argtype=MSec)
+    __fields__ = [
+        ("_", Header()),
+        ("time", DateTime("time")),
+        ("msec", MSec("msec")),
+    ]
 
-class Header32_Ex(Header):
+class Header32_Ex(BSMStruct):
     """
     * The Solaris specifications for AUE_HEADER32_EX seem to differ a bit
     * depending on the bit of the specifications found.  The OpenSolaris source
@@ -195,30 +83,30 @@ class Header32_Ex(Header):
     """
 
     token_id = AUT_HEADER32_EX
+    identifier = "header"
 
-    def _setup(self):
-        super()._setup()
-        self.add_argument("address", argtype=IPAddress)
-        #self.add_argument("address", "I", argtype=IPv4Address)#Conditional()
-        self.add_argument("time", argtype=DateTime)
-        self.add_argument("msec", argtype=MSec)
+    __fields__ = [
+        ("_", Header()),
+        ("address", IPAddress("address")),
+        ("time", DateTime("time")),
+        ("msec", MSec("msec"))
+    ]
 
-
-class Trailer(BaseToken):
+class Trailer(BSMStruct):
     """
-    trailer magic                        2 bytes
-    record size                          4 bytes
+    trailer magic 2 bytes show=False
+    record size   4 bytes
     """
 
     token_id = AUT_TRAILER
     identifier = "trailer"
 
-    def _setup(self):
-        self.add_argument("magic", argtype=UInt16, show=False)
-        self.add_argument("count", argtype=UInt32)
+    __fields__ = [
+        ("magic", UInt16("magic")),
+        ("count", UInt32("count")),
+    ]
 
-
-class Argument(BaseToken):
+class Argument(BSMStruct):
     """
     * argument #              1 byte
     * argument value          4 bytes/8 bytes (32-bit/64-bit value)
@@ -226,20 +114,24 @@ class Argument(BaseToken):
     * text                    N bytes + 1 terminating NULL byte
     """
 
-    token_id = AUT_ARG
     identifier = "argument"
 
-    def _setup(self):
-        self.add_argument("no", argtype=UInt8)
-        self.add_argument("val", argtype=UInt32)# Hex
-        self.add_argument("text", argtype=String)
+    __fields__ = [
+        ("no", UInt8("no")),
+        ("val", UInt32("val")),# Hex
+        ("text", String()),
+    ]
 
-
-class Arg32(Argument):
+class Arg32(BSMStruct):
     token_id = AUT_ARG32
+    identifier = "argument"
+
+    __fields__ = [
+        ("_", Argument()),
+    ]
 
 
-class Arg64(Argument):
+class Arg64(BSMStruct):
     """
        "no": ">b",
         "val": ">Q",
@@ -248,64 +140,135 @@ class Arg64(Argument):
     """
 
     token_id = AUT_ARG64
+    identifier = "argument"
+    
+    __fields__ = [
+        ("no", UInt8("no")),
+        ("val", UInt64("val")),# Hex
+        ("text", String()),
+    ]
+    
 
-    def _setup(self):
-        self.add_argument("no", argtype=UInt8)
-        self.add_argument("val", argtype=UInt64) #hex
-        self.add_argument("text", argtype=String)
-
-
-class Text(BaseToken):
+class Text(BSMStruct):
     token_id = AUT_TEXT
     identifier = "text"
 
-    def _setup(self):
-        self.add_argument("data", argtype=String)
+    __fields__ = [
+        ("data", String()),
+    ]
+    
 
-
-class Path(Text):
+class Path(BSMStruct):
     token_id = AUT_PATH
     identifier = "path"
 
+    __fields__ = [
+        ("data", String()),
+    ]
 
-class Return(BaseToken):
+
+class Return(BSMStruct):
     identifier = "return"
 
-    def _setup(self):
-        self.add_argument("errno", argtype=ReturnString)
-       
+    __fields__ = [
+        ("errno", ReturnString("errno")),
+    ]
+   
 
-class Return32(Return):
+class Return32(BSMStruct):
     """
         "errno": ">B",
         "value": ">I",
     """
     token_id = AUT_RETURN32
+    identifier = "return"
     
-    def _setup(self):
-        super()._setup()
-        self.add_argument("value", argtype=UInt32)
+    __fields__ = [
+        ("_", Return()),
+        ("value", UInt32("value")),
+    ]
 
-class Return64(Return):
+class Return64(BSMStruct):
     token_id = AUT_RETURN64
+    identifier = "return"
+    
+    __fields__ = [
+        ("_", Return()),
+        ("value", UInt64("value")),
+    ]
 
-    def _setup(self):
-        super()._setup()
-        self.add_argument("value", argtype=UInt64)
+class ReturnUuid(BSMStruct):
+    """ TODO:
+    { 
+        struct openbsm_uuid uuid_be;
+        int err = 0;
 
-class ReturnUuid(Return):
+        READ_TOKEN_U_CHAR(buf, len, tok->tt.ret_uuid.no, tok->len, err);
+        if (err)
+            return (-1);
+
+        READ_TOKEN_BYTES(buf, len, &uuid_be, sizeof(uuid_be), tok->len, err);
+        if (err)
+            return (-1);
+        openbsm_uuid_dec_be(&uuid_be,
+            (struct openbsm_uuid *)&tok->tt.ret_uuid.uuid);
+
+        READ_TOKEN_U_INT16(buf, len, tok->tt.ret_uuid.len, tok->len, err);
+        if (err)
+            return (-1);
+
+        SET_PTR((char*)buf, len, tok->tt.ret_uuid.text, tok->tt.ret_uuid.len,
+            tok->len, err);
+        if (err)
+            return (-1);
+
+        return (0);
+    }
+    """
     token_id = AUT_RETURN_UUID
     identifier = "ret_uuid"
-    def _setup(self):
-        super()._setup()
-        self.add_argument("uuid_be", "sizeof_uuid", argtype='uuid')
-        self.add_argument("uuid", argtype=String)
 
-class Uuid(BaseToken):
+    __fields__ = [
+        ("_", Return()),
+        ("size_of_uuid", UInt16("size_of_uuid")),
+        ("uuid", String()),
+    ]
+
+
+class Uuid(BSMStruct):
+    """
+    """
     toekn_id = AUT_ARG_UUID
     identifier = "uuid"
 
-class Identity(BaseToken):
+    __fields__ = [
+        ("no", UInt8()),
+        ("uuid_be", "set_uuid_be"),
+        ("uuid", ByteString(length_fmt="H"))
+    ]
+
+    def set_uuid_be(self, rec :Rec):
+        uuid_fields = [
+            ("time_low", UInt32()),
+            ("time_mid", UInt16()),
+            ("time_hi_and_version", UInt16()),
+            ("clock_seq_hi_and_reserved", UInt8()),
+            ("clock_seq_low", UInt8()),
+        ]
+        uuid_struct_fmt = ">"
+        size = 0
+        for name, field in uuid_fields: 
+            uuid_struct_fmt += field.fmt
+            size += field.size
+        if size > self.no:
+            return None
+        uuid_struct_fmt += f"{self.no-size}s"
+        uuid_fields.append(("node", None))
+        uuid = struct.unpack(uuid_struct_fmt, rec.read(self.no))
+        return OrderedDict(zip([name for name, _ in uuid_fields], uuid))
+
+
+class Identity(BSMStruct):
     """
     "signer_type": ">I",
     "signing_size": ">H",
@@ -321,30 +284,29 @@ class Identity(BaseToken):
     token_id = AUT_IDENTITY
     identifier = "identity"
 
-    def _setup(self):
-        self.add_argument("signer_type",            argtype=UInt32)
-        self.add_argument("signing_id",             argtype=String)
-        self.add_argument("signing_id_truncated",   argtype=CompleteString)
-        self.add_argument("team_id",                argtype=String)
-        self.add_argument("team_id_truncated",      argtype=CompleteString)
-        self.add_argument("cbhash",                 argtype=ByteString)
+    __fields__ = [
+        ("signer_type",             UInt32("signer_type")),
+        ("signing_id",              String()),
+        ("signing_id_truncated",    CompleteString("signing_id_truncated")),
+        ("team_id",                 String()),
+        ("team_id_truncated",       CompleteString("team_id_truncated")),
+        ("cbhash",                  ByteString()),
+    ]
 
-
-class Subject(BaseToken):
-    token_id = AUT_SUBJECT
+class Subject(BSMStruct):
     identifier = "subject"
 
-    def _setup(self):
-        self.add_argument("auid", argtype=User)
-        self.add_argument("euid", argtype=User)
-        self.add_argument("egid", argtype=Group)
-        self.add_argument("ruid", argtype=User)
-        self.add_argument("rgid", argtype=Group)
-        self.add_argument("pid", argtype=Process)
-        self.add_argument("sid", argtype=UInt32)
+    __fields__ = [
+        ("auid", User("auid")),
+        ("euid", User("euid")),
+        ("egid", Group("egid")),
+        ("ruid", User("ruid")),
+        ("rgid", Group("rgid")),
+        ("pid", Process("pid")),
+        ("sid", UInt32("sid")),
+    ]
 
-
-class Subject32(Subject):
+class Subject32(BSMStruct):
     """
     audit ID                4 bytes
     effective user ID       4 bytes
@@ -359,14 +321,15 @@ class Subject32(Subject):
     """
 
     token_id = AUT_SUBJECT32
+    identifier = "subject"
 
-    def _setup(self):
-        super()._setup()
-        self.add_argument("tid_port", argtype=UInt32)
-        self.add_argument("tid_address", argtype=IPv4Address)
+    __fields__ = [
+        ("_", Subject()),
+        ("tid_port", UInt32("tid_port")),
+        ("tid_address", IPv4Address("tid_address")),
+    ]
 
-
-class Subject32_Ex(Subject):
+class Subject32_Ex(BSMStruct):
     """
     * audit ID                     4 bytes
     * euid                         4 bytes
@@ -384,21 +347,31 @@ class Subject32_Ex(Subject):
     token_id = AUT_SUBJECT32_EX
     identifier = "subject_ex"
 
-    def _setup(self):
-        super()._setup()
-        self.add_argument("tid_port", argtype=UInt32)
-        self.add_argument("tid_type", argtype=UInt32, show=False)
-        self.add_argument("tid_address", argtype=IPAddress)
+    __fields__ = [
+        ("_", Subject()),
+        ("tid_port", UInt32("tid_port")),
+        ("tid_address", IPAddress("tid_address")),
+    ]
 
 #TODO: Complete Subject64
-class Subject64(Subject):
+class Subject64(BSMStruct):
     token_id = AUT_SUBJECT64
+    identifier = "subject"
+
+    __fields__ = [
+        ("_", Subject()),
+    ]
 
 #TODO: Complete Subject64Ex
-class Subject64Ex(Subject):
+class Subject64Ex(BSMStruct):
     token_id = AUT_SUBJECT64_EX
+    identifier = "subject_ex"
 
-class Attr(BaseToken):
+    __fields__ = [
+        ("_", Subject()),
+    ]
+
+class Attr(BSMStruct):
     """
     * file access mode        4 bytes
     * owner user ID           4 bytes
@@ -410,30 +383,40 @@ class Attr(BaseToken):
     token_id = AUT_ATTR
     identifier = "attribute"
 
-    def _setup(self):
-        self.add_argument('mode', argtype=UInt32)
-        self.add_argument('uid', argtype=User)
-        self.add_argument('gid', argtype=Group)
-        self.add_argument('fsid', argtype=UInt32)
-        self.add_argument('nodeid', argtype=UInt64)
-        self.add_argument('device', argtype=UInt32)
-
-class Attr32(Attr):
+    __fields__ = [
+        ("mode", UInt32("mode")),
+        ("uid", User("uid")),
+        ("gid", Group("gid")),
+        ("fsid", UInt32("fsid")),
+        ("nodeid", UInt64("nodeid")),
+        ("device", UInt32("device")),
+    ]
+class Attr32(BSMStruct):
     token_id = AUT_ATTR32
+    identifier = "attribute"
 
-class Attr64(Attr):
+    __fields__ = [
+        ("_", Attr()),
+    ]
+
+class Attr64(BSMStruct):
     token_id = AUT_ATTR64
+    identifier = "attribute"
+
+    __fields__ = [
+        ("_", Attr()),
+    ]
 
 
-class Opaque(BaseToken):
+class Opaque(BSMStruct):
     token_id = AUT_OPAQUE
     identifier = "opaque"
 
-    def _setup(self):
-        self.add_argument("data", argtype=ByteString)
+    __fields__ = [
+        ("data", ByteString())
+    ]
 
-
-class Exit(BaseToken):
+class Exit(BSMStruct):
     """
     * status                  4 bytes
     * return value            4 bytes
@@ -441,87 +424,56 @@ class Exit(BaseToken):
     token_id = AUT_EXIT
     identifier = "exit"
 
-    def _setup(self):
-        self.add_argument('errval', argtype=UInt32)
-        self.add_argument('retval', argtype=UInt32)
-
-class ExecArgs(BaseToken):
-    """ TODO:
-     * count                   4 bytes
+    __fields__ = [
+        ("errval", UInt32("errval")),
+        ("retval", UInt32("retval")),
+    ]
+class ExecArgs(BSMStruct):
+    """
+    * count                   4 bytes
     * text                    count null-terminated string(s)
-    fetch_execarg_tok(tokenstr_t *tok, u_char *buf, int len)
-{
-	int err = 0;
-	u_int32_t i;
-	u_char *bptr;
 
-	READ_TOKEN_U_INT32(buf, len, tok->tt.execarg.count, tok->len, err);
-	if (err)
-		return (-1);
-
-	for (i = 0; i < tok->tt.execarg.count; i++) {
-		bptr = buf + tok->len;
-		if (i < AUDIT_MAX_ARGS)
-			tok->tt.execarg.text[i] = (char*)bptr;
-
-		/* Look for a null terminated string. */
-		while (bptr && (*bptr != '\0')) {
-			if (++tok->len >= (u_int32_t)len)
-				return (-1);
-			bptr = buf + tok->len;
-		}
-		if (!bptr)
-			return (-1);
-		tok->len++; /* \0 character */
-	}
-	if (tok->tt.execarg.count > AUDIT_MAX_ARGS)
-		tok->tt.execarg.count = AUDIT_MAX_ARGS;
-
-	return (0);
-}
     """
     token_id = AUT_EXEC_ARGS
     identifier = "exec arg"
 
-    def _setup(self):
-        self.add_argument("")
+    __fields__ = [
+        ("count", UInt32()),
+        ("args", "set_args"),
+    ]
+    def set_args(self, rec: Rec):
+        """TODO: Check AUDIT_MAX_ARGS
+        for (i = 0; i < tok->tt.execarg.count; i++) {
+            bptr = buf + tok->len;
+            if (i < AUDIT_MAX_ARGS)
+                tok->tt.execarg.text[i] = (char*)bptr;
 
-class ExecEnv(BaseToken):
+            /* Look for a null terminated string. */
+            while (bptr && (*bptr != '\0'), {
+                if (++tok->len >= (u_int32_t)len)
+                    return (-1);
+                bptr = buf + tok->len;
+            }
+            if (!bptr)
+                return (-1);
+            tok->len++; /* \0 character */
+        }
+        if (tok->tt.execarg.count > AUDIT_MAX_ARGS)
+            tok->tt.execarg.count = AUDIT_MAX_ARGS;
+        """
+        return [String(length_fmt="", until_null=True)(rec) for i in range(self.count.value)]
+
+class ExecEnv(BSMStruct):
     """ TODO:
-    fetch_execenv_tok(tokenstr_t *tok, u_char *buf, int len)
-{
-	int err = 0;
-	u_int32_t i;
-	u_char *bptr;
-
-	READ_TOKEN_U_INT32(buf, len, tok->tt.execenv.count, tok->len, err);
-	if (err)
-		return (-1);
-
-	for (i = 0; i < tok->tt.execenv.count; i++) {
-		bptr = buf + tok->len;
-		if (i < AUDIT_MAX_ENV)
-			tok->tt.execenv.text[i] = (char*)bptr;
-
-		/* Look for a null terminated string. */
-		while (bptr && (*bptr != '\0')) {
-			if (++tok->len >= (u_int32_t)len)
-				return (-1);
-			bptr = buf + tok->len;
-		}
-		if (!bptr)
-			return (-1);
-		tok->len++; /* \0 character */
-	}
-	if (tok->tt.execenv.count > AUDIT_MAX_ENV)
-		tok->tt.execenv.count = AUDIT_MAX_ENV;
-
-	return (0);
     """
     token_id = AUT_EXEC_ENV
     identifier = "exec env"
 
-class OtherFile(BaseToken):
+    __fields__ = [
+        ("args", Texts("args")),
+    ]
+
+class OtherFile(BSMStruct):
     """
     * seconds of time          4 bytes
     * milliseconds of time     4 bytes
@@ -531,35 +483,48 @@ class OtherFile(BaseToken):
     token_id = AUT_OTHER_FILE32
     identifier = "file"
 
-    def _setup(self):
-        self.add_argument("time", argtype=UInt32)
-        self.add_argument("msec", argtype=MSec)
-        self.add_argument("pathname", argtype=String)
+    __fields__ = [
+        ("time",        UInt32("time")),
+        ("msec",        MSec("msec")),
+        ("pathname",    String(with_null=True)),
+    ]
 
 
-
-class NewGroups(BaseToken):
+class NewGroups(BSMStruct):
     """
-     * number groups           2 bytes
+    * number groups           2 bytes
     * group list              count * 4 bytes
     """
     token_id = AUT_NEWGROUPS
     identifier = "group"
     
-    def _setup(self):
-        self.add_argument("groups", "{count}I", argtype=Groups)
+    __fields__ = [
+        ("num", UInt16()),
+        ("groups", "set_groups"),
+    ]
 
-class InAddr(BaseToken):
+    def set_groups(self, rec: Rec):
+        """
+        for (i = 0; i<tok->tt.grps.no; i++) {
+            READ_TOKEN_U_INT32(buf, len, tok->tt.grps.list[i], tok->len,
+                err);
+            if (err)
+                return (-1);
+        }
+        """
+        return [UInt16.unpack(rec) for i in range(self.num.value)]
+    
+class InAddr(BSMStruct):
     """
      * Internet addr 4 bytes
     """
     token_id = AUT_IN_ADDR
     identifier = "ip addr"
 
-    def _setup(self):
-        self.add_argument("addr", argtype=IPv4Address)
-
-class InAddrEx(BaseToken):
+    __fields__ = [
+        ("addr", IPv4Address("addr")),
+    ]
+class InAddrEx(BSMStruct):
     """
     type 4 bytes
     address 16 bytes
@@ -567,30 +532,29 @@ class InAddrEx(BaseToken):
     token_id = AUT_IN_ADDR_EX
     identifier = "ip addr ex"
     
-    def _setup(self):
-        self.add_argument("ad_type", argtype=UInt32)
-        self.add_argument("address", argtype=IPv6Address) # print_ip_ex_address
-
-class Ip(BaseToken):
+    __fields__ = [
+        ("address", IPAddress("address")),
+    ]
+class Ip(BSMStruct):
     """ TODO:
     ip header 20 bytes
     """
     token_id = AUT_IP
     identifier = "ip"
 
-    def _setup(self):
-        self.add_argument("version", "B", argtype=UInt32)
-        self.add_argument("tos", "B", argtype=UInt32)
-        self.add_argument("len", "H", argtype=UInt32)
-        self.add_argument("id", "H", argtype=UInt32)
-        self.add_argument("offset", "H", argtype=UInt32)
-        self.add_argument("ttl", "B", argtype=UInt32)
-        self.add_argument("prot", "B", argtype=UInt32)
-        self.add_argument("chksm", "H", argtype=UInt32)
-        self.add_argument("src", "I", argtype=UInt32)
-        self.add_argument("dest", "I", argtype=UInt32)
-
-class Ipc(BaseToken):
+    __fields__ = [
+        ("version",UInt32("version")),
+        ("tos",UInt32("tos")),
+        ("len",UInt32("len")),
+        ("id",UInt32("id")),
+        ("offset",UInt32("offset")),
+        ("ttl",UInt32("ttl")),
+        ("prot",UInt32("prot")),
+        ("chksm",UInt32("chksm")),
+        ("src",UInt32("src")),
+        ("dest",UInt32("dest")),
+    ]
+class Ipc(BSMStruct):
     """ TODO:
      * object ID type       1 byte
     * Object ID            4 bytes
@@ -598,11 +562,11 @@ class Ipc(BaseToken):
     token_id = AUT_IPC
     identifier = "ipc"
 
-    def _setup(self):
-        self.add_argument("ipc_type", "B", argtype=UInt32)
-        self.add_argument("ipc_id", "I", argtype=UInt32)
-
-class IpcPerm(BaseToken):
+    __fields__ = [
+        ("ipc_type", UInt32("ipc_type")),
+        ("ipc_id", UInt32("ipc_id")),
+    ]
+class IpcPerm(BSMStruct):
     """ TODO:
      * owner user id        4 bytes
     * owner group id       4 bytes
@@ -615,28 +579,28 @@ class IpcPerm(BaseToken):
     token_id = AUT_IPC_PERM
     identifier = "IPC perm"
 
-    def _setup(self):
-        self.add_argument("uid", "I", argtype=UInt32)
-        self.add_argument("gid", "I", argtype=UInt32)
-        self.add_argument("puid", "I", argtype=UInt32)
-        self.add_argument("pgid", "I", argtype=UInt32)
-        self.add_argument("mode", "I", argtype=UInt32)
-        self.add_argument("seq", "I", argtype=UInt32)
-        self.add_argument("key", "I", argtype=UInt32)
+    __fields__ = [
+        ("uid",UInt32("uid")),
+        ("gid",UInt32("gid")),
+        ("puid",UInt32("puid")),
+        ("pgid",UInt32("pgid")),
+        ("mode", UInt32("mode")),
+        ("seq", UInt32("seq")),
+        ("key", UInt32("key")),
+    ]
 
-
-class Iport(BaseToken):
+class Iport(BSMStruct):
     """ TODO:
      * port Ip address  2 bytes
     """
     token_id = AUT_IPORT
     identifier = "ip port"
 
-    def _setup(self):
-        self.add_argument("port", "H", argtype=UInt32)
+    __fields__ = [
+        ("port", UInt32("port")),
+    ]
 
-
-class Process32(Subject32):
+class Process32(BSMStruct):
     """ TODO:
      * token ID                     1 byte
     * audit ID                     4 bytes
@@ -653,7 +617,11 @@ class Process32(Subject32):
     token_id = AUT_PROCESS32
     identifier = "process"
 
-class Process32Ex(Subject32_Ex):
+    __fields__ = [
+        ("_", Subject32()),
+    ]
+
+class Process32Ex(BSMStruct):
     """ TODO:
     * token ID                1 byte
     * audit ID                4 bytes
@@ -670,8 +638,13 @@ class Process32Ex(Subject32_Ex):
     """
     token_id = AUT_PROCESS32_EX
     identifier = "process"
+    
+    __fields__ = [
+        ("_", Subject32_Ex()),
+    ]
 
-class Process64(Subject):
+
+class Process64(BSMStruct):
     """ TODO:
     * token ID                     1 byte
     * audit ID                     4 bytes
@@ -689,12 +662,12 @@ class Process64(Subject):
     token_id = AUT_PROCESS64
     identifier = "process"
 
-    def _setup(self):
-        super()._setup()
-        self.add_argument("tid_port", "Q", argtype=UInt32)
-        self.add_argument("tid_address", "I", argtype=IPv4Address)
-
-class Process64Ex(Subject):
+    __fields__ = [
+        ("_", Subject()),
+        ("tid_port", UInt64("tid_port")),
+        ("tid_address", IPv4Address("tid_address")),
+    ]
+class Process64Ex(BSMStruct):
     """ TODO:
     * token ID                1 byte
     * audit ID                4 bytes
@@ -712,22 +685,21 @@ class Process64Ex(Subject):
     token_id = AUT_PROCESS64_EX
     identifier = "process"
 
-    def _setup(self):
-        super()._setup()
-        self.add_argument("tid_port", "Q", argtype=UInt32)
-        self.add_argument("tid_addr_type", "I", argtype=UInt32)
-        self.add_argument("tid_address", "2Q", argtype=UInt32)
+    __fields__ = [
+        ("_", Subject()),
+        ("tid_port", UInt64("tid_port")),
+        ("tid_address", IPAddress("tid_address")),
+    ]
 
-
-class Seq(BaseToken):
+class Seq(BSMStruct):
     token_id = AUT_SEQ
     identifier = "sequence"
 
-    def _setup(self):
-        self.add_argument("seqno", argtype=UInt32)
+    __fields__ = [
+        ("seqno", UInt32("seqno")),
+    ]
 
-
-class Socket(BaseToken):
+class Socket(BSMStruct):
     """
     * socket type             2 bytes
     * local port              2 bytes
@@ -738,15 +710,15 @@ class Socket(BaseToken):
     token_id = AUT_SOCKET
     identifier = "socket"
 
-    def _setup(self):
-        self.add_argument("sock_type", argtype=UInt16)
-        self.add_argument("l_port", argtype=UInt16)
-        self.add_argument("l_addr", argtype=IPv4Address)
-        self.add_argument("r_port", argtype=UInt16)
-        self.add_argument("r_addr", argtype=IPv4Address)
-    
+    __fields__ = [
+        ("sock_type", UInt16("sock_type")),
+        ("l_port", UInt16("l_port")),
+        ("l_addr", IPv4Address("l_addr")),
+        ("r_port", UInt16("r_port")),
+        ("r_addr", IPv4Address("r_addr")),
+    ]
 
-class SockInet32(BaseToken):
+class SockInet32(BSMStruct):
     """
     * socket family           2 bytes
     * local port              2 bytes
@@ -755,14 +727,12 @@ class SockInet32(BaseToken):
     token_id = AUT_SOCKINET32
     identifier = "socket-inet"
 
-    def _setup(self):
-        self.add_argument("family", argtype=UInt16)
-        self.add_argument("port", argtype=UInt16)
-        self.add_argument("address", argtype=IPv4Address)
-
-#TODO: Complete Token classes
-
-class SockUnix(BaseToken):
+    __fields__ = [
+        ("family", UInt16("family")),
+        ("port", UInt16("port")),
+        ("address", IPv4Address("address")),
+    ]
+class SockUnix(BSMStruct):
     """
     * socket family           2 bytes
     * path                    (up to) 104 bytes + NULL (NULL terminated string).
@@ -770,11 +740,12 @@ class SockUnix(BaseToken):
     token_id = AUT_SOCKUNIX
     identifier = "socket-unix"
 
-    def _setup(self):
-        self.add_argument("addr_type", argtype=UInt16)
-        self.add_argument("path", argtype=String)
+    __fields__ = [
+        ("family", UInt16()),
+        ("path", String(length_fmt="", until_null=True, max_length=105)), # String("path", max_len=104, end_with_null=True)
+    ]
 
-class SockInet128(BaseToken):
+class SockInet128(BSMStruct):
     """
     * socket family	 2 bytes
     * local port		 2 bytes
@@ -783,12 +754,16 @@ class SockInet128(BaseToken):
     token_id = AUT_SOCKINET128
     identifier = "socket-inet6"
 
-    def _setup(self):
-        self.add_argument("sock_type", argtype=UInt16)
-        self.add_argument("port", argtype=UInt16)
-        self.add_argument("addr", argtype=IPAddress) # TODO: This field is dynamic field.
+    __fields__ = [
+        ("sock_type", UInt16("sock_type")),
+        ("port", UInt16("port")),
+        ("addr", IPAddress("addr")), # TODO: This field is dynamic field.
+    ]
 
-class SocketEx(BaseToken):
+
+AU_IPv4 = 4
+AU_IPv16 = 16
+class SocketEx(BSMStruct):
     """
     * socket domain           2 bytes
     * socket type             2 bytes
@@ -801,17 +776,29 @@ class SocketEx(BaseToken):
     token_id = AUT_SOCKET_EX
     identifier = "socket"
 
-    def _setup(self):
-        self.add_argument("domain", argtype=UInt16)
-        self.add_argument("sock_type", argtype=UInt16)
-        self.add_argument("addr_type", argtype=UInt16)
-        self.add_argument("l_port", argtype=UInt16)
-        self.add_argument("l_addr", argtype=IPAddress)  # TODO: This field is dynamic field.
-        self.add_argument("r_port", argtype=UInt16)
-        self.add_argument("r_addr", argtype=IPAddress)  # TODO: This field is dynamic field.
-    
+    __fields__ = [
+        ("domain", UInt16("domain")),
+        ("sock_type", UInt16("sock_type")),
+        ("addr_type", UInt16("addr_type")),
+        ("l_port", UInt16("l_port")),
+        ("l_addr", "set_addr"),  
+        ("r_port", UInt16("r_port")),
+        ("r_addr", "set_addr"),  
+    ]
 
-class Arb(BaseToken):
+    def set_addr(self, rec: Rec):
+        addr = None
+        if self.addr_type.value == AU_IPv4:
+            addr = IPv4Address().unpack(rec)
+        elif self.addr_type.value == AU_IPv16:
+            addr = IPv6Address().unpack(rec)
+        else:
+            raise Exception(f"Unkonw AddrType: {self.addr_type.value}")
+
+        return addr
+
+
+class Arb(BSMStruct):
     """
     * how to print            1 byte
     * basic unit              1 byte
@@ -821,14 +808,26 @@ class Arb(BaseToken):
     token_id = AUT_DATA
     identifier = "arbitrary"
 
-    def _setup(self):
-        self.add_argument("howtopr", argtype=UInt8)
-        self.add_argument("bu", argtype=UInt8)
-        self.add_argument("uc", argtype=UInt8)
-        self.add_argument("data", "{}s", argtype=String) # TODO: Depends on pre-parsed value
+    __fields__ = [
+        ("howtopr", UInt8("howtopr")),
+        ("bu", UInt8("bu")),
+        ("uc", UInt8("uc")),
+        ("data", "set_data"),
+    ]
 
+    def set_data(self, rec: Rec):
+        datasize_dict = {
+            AUR_BYTE: AUR_BYTE_FORMAT,
+            AUR_SHORT: AUR_SHORT_FORMAT,
+            AUR_INT32: AUR_INT32_FORMAT,
+            AUR_INT64: AUR_INT64_FORMAT,
+        }
+        datasize = datasize_dict[self.bu.value]
+        fmt = f">{self.uc}{datasize}"
+        fmt_length = struct.calcsize(fmt)
+        return struct.unpack(fmt, rec.read(fmt_length))
 
-class Zonename(BaseToken):
+class Zonename(BSMStruct):
     """
     * size                         2 bytes;
     * zonename                     size bytes;
@@ -836,10 +835,11 @@ class Zonename(BaseToken):
     token_id = AUT_ZONENAME
     identifier = "zone"
 
-    def _setup(self):
-        self.add_argument("zoename", "{len}s", len_fmt="H", argtype=String)
-    
-class Upriv(BaseToken):
+    __fields__ = [
+        ("zonename", String()),
+    ]
+
+class Upriv(BSMStruct):
     """
     * status                       1 byte
     * privstrlen                   2 bytes
@@ -848,12 +848,13 @@ class Upriv(BaseToken):
     token_id = AUT_UPRIV
     identifier = "use of privilege"
 
-    def _setup(self):
-        self.add_argument("status", type=UInt8)
-        self.add_argument("priv", argtype=String) # TODO: string with terminator
-    
+    __fields__ = [
+        ("status", UInt8("status")),
+        ("priv", String(with_null=True)),
+    ]
 
-class Priv(BaseToken):
+
+class Priv(BSMStruct):
     """
     /*
     * privtstrlen		1 byte
@@ -865,6 +866,7 @@ class Priv(BaseToken):
     token_id = AUT_PRIV
     identifier = "priv"
 
-    def _setup(self):
-        self.add_argument("privset", type=String) # TODO length is not 16 bytes, it might requires __new__ function
-        self.add_argument("privstr", type=String) # TODO length is not 16 bytes
+    __fields__ = [
+        ("privset", String(length_fmt="B", with_null=True)),
+        ("privstr", String(length_fmt="B", with_null=True)),
+    ]
