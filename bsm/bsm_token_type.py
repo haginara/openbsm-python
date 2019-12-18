@@ -3,10 +3,11 @@ import grp
 import logging
 import struct
 from datetime import datetime
+from collections import namedtuple
 from typing import List, Dict, Optional, Any, Type, TypeVar
 
 
-from .audit_event import get_audit_events
+from .audit_event import get_audit_events, AUDIT_EVENT
 from .bsm_h import *
 from .bsm_errors import BSM_ERRORS
 from .audit_record import *
@@ -38,6 +39,13 @@ class ArgType(object):
 
     def __str__(self):
         return self.__repr__()
+    
+    def __getattr__(self, key):
+        if isinstance(self.value, dict) and key in self.value:
+            return self.value[key]
+        elif isinstance(self.value, AUDIT_EVENT) and key in self.value._asdict():
+            return getattr(self.value, key)
+        raise AttributeError(f"{key} is not in value({self.value})")
     
     @property
     def struct_fmt(self):
@@ -125,7 +133,7 @@ class EventType(ArgType):
 
     def __repr__(self):
         return f"{self.value.identifier}:{self.value.entry}"
-
+    
     def _unpack(self):
         self.value = AUDIT_EVENTS.get(self._raw[0], "Unknown")
 
@@ -375,7 +383,7 @@ class Struct(object):
         self.values = OrderedDict()
 
     def __repr__(self):
-        return f"{self.__class__}"
+        return f"<{self.__class__.__name__} {','.join([f'{key}={value}' for key, value in self.values.items()])}>"
 
     def __getattr__(self, value):
         if value not in self.__dict__:

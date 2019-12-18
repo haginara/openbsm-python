@@ -111,13 +111,13 @@ def main():
     options = get_options(sys.argv[1:])
     oflags = AU_OFLAG_NONE
     if options.raw:
-        oflags |= Record.DUMP_RAW
+        oflags |= DUMP_RAW
     elif options.short:
-        oflags |= Record.DUMP_SHORT
+        oflags |= DUMP_SHORT
     elif options.xml:
-        oflags |= Record.DUMP_XML
+        oflags |= DUMP_XML
     elif options.json:
-        oflags |= Record.DUMP_JSON
+        oflags |= DUMP_JSON
     f = get_fd(options.path)
     try:
         if options.partial:
@@ -131,20 +131,15 @@ def main():
                 if not _bsm_type:
                     return
 
-        if oflags & Record.DUMP_JSON: 
+        if oflags & DUMP_JSON: 
             import json
             for record in au_read_rec(f):
                 data = record.asdict() 
                 print(json.dumps(data, indent=2))
         else:
             for record in au_read_rec(f, options.partial):
+                print(f"{record.header.event_type!r:<50} | {record.timestamp} | {record.tokens[1:]}")
                 #record.print(oflags)
-                found = False
-                if record.header()['event_type'].value.entry.startswith("open"):
-                    record.print(oflags)
-                    print("="*100)
-    except Exception as e:
-        print(f"{e}")
     except KeyboardInterrupt:
         print(f"Exit...")
     finally:

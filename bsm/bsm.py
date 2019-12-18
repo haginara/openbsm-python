@@ -20,6 +20,12 @@ AUDIT_EVENTS = get_audit_events()
 AUDIT_HEADER_SIZE = 18
 AUDIT_TRAILER_SIZE = 7
 
+DUMP_COM = 0x0000
+DUMP_RAW = 0x0001
+DUMP_SHORT = 0x0002
+DUMP_XML = 0x0004
+DUMP_NORESOLVE = 0x0008
+DUMP_JSON = 0x0010
 
 class NotYetImplementedToken(Exception):
     pass
@@ -28,18 +34,15 @@ class NotYetImplementedToken(Exception):
 class UnknownHeader(Exception):
     pass
 
+class NoBSMTokens(Exception):
+    pass
+
 
 class Record(object):
     """BSM Record object
 
     bsm record has bsm tokens
     """
-    DUMP_COM = 0x0000
-    DUMP_RAW = 0x0001
-    DUMP_SHORT = 0x0002
-    DUMP_XML = 0x0004
-    DUMP_NORESOLVE = 0x0008
-    DUMP_JSON = 0x0010
 
     def __init__(self, data) -> bytes:
         self.data = data
@@ -47,10 +50,20 @@ class Record(object):
         self.bytesread = 0
 
         self.fetch_tokens()
+    
+    def validate(self):
+        if not self.tokens:
+            raise NoBSMTokens
 
+    @property
     def header(self):
-        if self.tokens:
-            return self.tokens[0].values
+        self.validate()
+        return self.tokens[0]
+    
+    @property
+    def timestamp(self):
+        self.validate()
+        return f"{self.header.time}{self.header.msec}"
 
     def remains(self):
         return self.length - self.bytesread
