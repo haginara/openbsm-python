@@ -12,7 +12,7 @@ from .audit_event import AUDIT_EVENT, get_audit_events
 from .bsm_h import *
 from .bsm_errors import BSM_ERRORS
 from .audit_record import *
-from .argtypes import *
+from .bsm_token_type import *
 
 logger = logging.getLogger(__name__)
 

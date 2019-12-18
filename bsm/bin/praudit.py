@@ -15,7 +15,7 @@ import pprint
 import argparse
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)
 
 def get_options(argv):
     parser = argparse.ArgumentParser()
@@ -138,7 +138,15 @@ def main():
                 print(json.dumps(data, indent=2))
         else:
             for record in au_read_rec(f, options.partial):
-                record.print(oflags)
+                #record.print(oflags)
+                found = False
+                if record.header()['event_type'].value.entry.startswith("open"):
+                    record.print(oflags)
+                    print("="*100)
+    except Exception as e:
+        print(f"{e}")
+    except KeyboardInterrupt:
+        print(f"Exit...")
     finally:
         f.close()
 

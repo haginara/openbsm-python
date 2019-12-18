@@ -124,7 +124,7 @@ class EventType(ArgType):
     struct_fmt = "H"
 
     def __repr__(self):
-        return self.value.entry
+        return f"{self.value.identifier}:{self.value.entry}"
 
     def _unpack(self):
         self.value = AUDIT_EVENTS.get(self._raw[0], "Unknown")

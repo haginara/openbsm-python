@@ -11,7 +11,7 @@ from .audit_event import AUDIT_EVENT, get_audit_events
 from .bsm_token import *
 from .bsm_h import *
 from .audit_record import *
-from .argtypes import *
+from .bsm_token_type import *
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,10 @@ class UnknownHeader(Exception):
 
 
 class Record(object):
+    """BSM Record object
+
+    bsm record has bsm tokens
+    """
     DUMP_COM = 0x0000
     DUMP_RAW = 0x0001
     DUMP_SHORT = 0x0002
@@ -43,6 +47,10 @@ class Record(object):
         self.bytesread = 0
 
         self.fetch_tokens()
+
+    def header(self):
+        if self.tokens:
+            return self.tokens[0].values
 
     def remains(self):
         return self.length - self.bytesread
@@ -76,7 +84,7 @@ class Record(object):
                     f"NotImplementedToken: 0x{token_id:x}, reamins: {self.remains()}"
                 )
             logger.debug(f"Total: {self.length}, read: {self.bytesread}")
-
+    
     def print(self, oflags: int):
         for token in self.tokens:
             token.print(oflags)
