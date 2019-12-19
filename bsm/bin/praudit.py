@@ -138,7 +138,10 @@ def main():
                 print(json.dumps(data, indent=2))
         else:
             for record in au_read_rec(f, options.partial):
-                print(f"{record.header.event_type!r:<50} | {record.timestamp} | {record.tokens[1:]}")
+                print(  f"{record.header.event_type!r:<50} | "
+                        f"{record.timestamp} | "
+                        f"{record.tokens[1:]}"
+                )
                 #record.print(oflags)
     except KeyboardInterrupt:
         print(f"Exit...")
