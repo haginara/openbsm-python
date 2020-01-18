@@ -15,10 +15,12 @@ import pprint
 import argparse
 import logging
 
+from termcolor import colored, cprint
+
 logging.basicConfig(level=logging.ERROR)
 
 def get_options(argv):
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='praudit [options] [path]')
     parser.add_argument("-d", help="Specifies the delimiter. The delimiter is the comma.")
     parser.add_argument(
         "-l", action="store_true",
@@ -138,7 +140,15 @@ def main():
                 print(json.dumps(data, indent=2))
         else:
             for record in au_read_rec(f, options.partial):
-                print(f"{record.header.event_type!r:<50} | {record.timestamp} | {record.tokens[1:]}")
+                if options.filter:
+                    out = f"{record.header.event_type!r:<50} | {record.timestamp} | {record.tokens[1:]}"
+                    if options.filter in out:
+                        loc = out.find(options.filter)
+                        print(out[:loc], end='')
+                        cprint(out[loc:loc+len(options.filter)], 'red', end='')
+                        print(out[loc+len(options.filter):])
+                else:
+                    print(f"{record.header.event_type!r:<50} | {record.timestamp} | {record.tokens[1:]}")
                 #record.print(oflags)
     except KeyboardInterrupt:
         print(f"Exit...")
