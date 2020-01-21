@@ -30,7 +30,6 @@ DUMP_JSON = 0x0010
 class NotYetImplementedToken(Exception):
     pass
 
-
 class UnknownHeader(Exception):
     pass
 
@@ -59,7 +58,11 @@ class Record(object):
     def header(self):
         self.validate()
         return self.tokens[0]
-    
+    @property
+    def tail(self):
+        self.validate()
+        return self.tokens[-1]
+
     @property
     def timestamp(self):
         self.validate()
