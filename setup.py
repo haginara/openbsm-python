@@ -11,6 +11,7 @@ with open("bsm/version.py") as f:
 version = _locals["__version__"]
 
 install_requires = [
+    "termcolor==1.1.0"
 ]
 
 setup(
